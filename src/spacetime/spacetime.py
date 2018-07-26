@@ -47,8 +47,8 @@ class Space(object):
 
 	def getCell(self, x, y=0.0, z=0.0):
 		nx = c * self.t - x
-		ny = c * self.t - y
-		nz = c * self.t - z
+		ny = c * self.t - y if self.dim > 1 else 0
+		nz = c * self.t - z if self.dim > 2 else 0
 		n = int(nx + self.t * (ny + self.t * nz))
 		print self.t, x, y, z, nx, ny, nz, n
 		return self.cells[n]
@@ -87,7 +87,7 @@ class SpaceTime(object):
 if __name__ == '__main__':
 	r = Rational(1, 27)
 	spacetime = SpaceTime(r.period(), 1)
-	spacetime.addRationalSet(27)
+	spacetime.addRational(r)
 
 	cell = spacetime.getCell(18, 0)
 	print cell.getCount(0), cell.getCount(1)
