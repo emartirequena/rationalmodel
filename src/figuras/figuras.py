@@ -57,7 +57,7 @@ class Linea():
         self.dasharray = dasharray
         self.puntos = [(0, 0)]
         
-    def anadePunto(self, (x, y)):
+    def anadePunto(self, x, y):
         self.puntos.append((x, y))
         
     def dibuja(self, dwg, grupo):
@@ -177,22 +177,39 @@ def lagrangianaDesplazada():
     caminomin = Camino('001111', color=rgb(148, 40, 40, '%'), grueso=0.05, dasharray=[0.1, 0.2])
     dibujo.anadeCaminoDebajo(caminomin)
     
-    dibujo.dibuja(r'C:\Users\enrique\Dropbox\Enrique\Articulo\figuras\Lagrangiana desplazada.svg')
+    dibujo.dibuja(r'C:\Users\enrique\Google Drive\Enrique\ArticuloRacionales\figuras\Lagrangiana desplazada.svg')
         
 
 def mallaBase():
-    dibujo = Dibujo(18)
-    dibujo.dibuja(r'C:\Users\enrique\Dropbox\Enrique\Articulo\figuras\Malla.svg')
+    dibujo = Dibujo(10)
+    dibujo.dibuja(r'C:\Users\enrique\Google Drive\Enrique\ArticuloRacionales\figuras\Malla 10.svg')
 
 def pathEn10Pasos(): 
-    dibujo = Dibujo(20)
-    camino = Camino('0110010001')
+    dibujo = Dibujo(10)
+    camino = Camino('0100100010')
     dibujo.anadeCaminoEncima(camino)
     linea = Linea(color=rgb(34, 126, 34, '%'))
     v = camino.obtieneVelocidad(dibujo.obtieneMalla())
-    linea.anadePunto(dibujo.obtienePos(v*float(20), 20))
+    linea.anadePunto(dibujo.obtienePos(v*float(10), 10))
     dibujo.anadeLinea(linea)
     
-    dibujo.dibuja(r'C:\Users\enrique\Dropbox\Enrique\ArticuloRacionales\figuras\path10pasos.svg')
+    dibujo.dibuja(r'C:\Users\enrique\Google Drive\Enrique\ArticuloRacionales\figuras\path de 290.svg')
 
+def pathDe341(): 
+    dibujo = Dibujo(10)
+    camino = Camino('0101010101')
+    dibujo.anadeCaminoEncima(camino)
+    linea = Linea(color=rgb(34, 126, 34, '%'))
+    v = camino.obtieneVelocidad(dibujo.obtieneMalla())
+    linea.anadePunto(dibujo.obtienePos(v*float(10), 10))
+    dibujo.anadeLinea(linea)
+    
+    dibujo.dibuja(r'C:\Users\enrique\Google Drive\Enrique\ArticuloRacionales\figuras\path de 341.svg')
+
+"""
+mallaBase()
 pathEn10Pasos()
+lagrangianaDesplazada()
+"""
+pathDe341()
+

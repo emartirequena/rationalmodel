@@ -1,4 +1,5 @@
 from math import sqrt
+from collections import OrderedDict as odict
 
 def appendEs2Sequences(sequences,es):
     result=[]
@@ -9,7 +10,6 @@ def appendEs2Sequences(sequences,es):
         for e in es:
             result+=[seq+[e] for seq in sequences]
     return result
-
 
 def cartesianproduct(lists):
     """
@@ -32,15 +32,16 @@ def primefactors(n):
 
 def factorGenerator(n):
     p = primefactors(n)
-    factors={}
+    factors=odict()
     for p1 in p:
         try:
             factors[p1]+=1
         except KeyError:
             factors[p1]=1
+    factors = odict(sorted(factors.items(), key=lambda t:t[0]))
     return factors
 
-def divisores(n):
+def divisors(n):
     factors = factorGenerator(n)
     divisors=[]
     listexponents=[map(lambda x:k**x,range(0,factors[k]+1)) for k in factors.keys()]
@@ -49,5 +50,3 @@ def divisores(n):
         divisors.append(reduce(lambda x, y: x*y, f, 1))
     divisors.sort()
     return divisors
-
-   
