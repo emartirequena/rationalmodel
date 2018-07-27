@@ -21,12 +21,12 @@ class Rational():
         digits = []
         reminders = []
         reminder = self.m
-        digit = int(reminder * base / self.n)
+        digit = int(reminder * base / float(self.n))
         while True:
             digits.append(digit)
             reminders.append(reminder)
             reminder = (reminder * base) % self.n
-            digit = int(reminder * base / self.n)
+            digit = int(reminder * base / float(self.n))
             if reminder == self.m:
                 break
         return (digits, reminders)
@@ -55,10 +55,13 @@ class Rational():
         digits = self.sequences[dim - 1][0]
         return ''.join([str(d) for d in digits])
 
+    def reminders(self, dim=1):
+        return self.sequences[dim - 1][1]
+
     def position(self, t, dim=1):
         x, y, z = self.getPosition(t, dim)
         if dim == 1:
-            return x
+            return (x, )
         elif dim == 2:
             return x, y
         return x, y, z
@@ -70,10 +73,10 @@ class Rational():
 
 
 if __name__ == '__main__':
-    r = Rational(5, 27)
-    print r.period(dim=2)
+    r = Rational(1, 5)
+    print r.period(dim=1)
     print r.path(dim=1)
     print r.path(dim=2)
     print r.path(dim=3)
     for t in range(19):
-        print t, r.position(t, dim=1)
+        print t, r.position(t, dim=1), r.digit(t, dim=1)
