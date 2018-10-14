@@ -22,13 +22,11 @@ class Rect(object):
 
 
 class Drawing(object):
-	def __init__(self, name, sizex, sizey, viewbox, haling='center', valing='center', margin=0):
+	def __init__(self, name, sizex, sizey, viewbox, margin=0):
 		self.path = os.path.join(root, name)
 		self.sizex = sizex
 		self.sizey = sizey
 		self.viewbox = viewbox
-		self.haling = haling
-		self.valing = valing
 		self.margin = margin
 		self.dwg = svgwrite.Drawing(
 			self.path,
@@ -41,15 +39,8 @@ class Drawing(object):
 
 		self.all.scale(1, -1)
 
-		tx = 0.0 if haling == 'left' else (0.5 if haling == 'center' else 1.0)
-		ty = 0.0 if valing == 'top' else (-0.5 if valing == 'center' else -1.0)
-		tmx = 1.0 if haling == 'left' else (0.0 if haling == 'center' else -1.0)
-		tmy = -1.0 if haling == 'left' else (0.0 if haling == 'center' else 1.0)
-		dx = tx * self.viewbox.width + tmx * margin
-		dy = ty * self.viewbox.height + tmy * margin
-		dx = 0.0
-		dy = 0.0
-		self.all.translate(dx, dy)
+		dy = self.viewbox.y
+		self.all.translate(0, dy)
 
 		self.strokewidth = 0.1
 		self.stroke = rgb(0, 0, 0, '%')
@@ -120,15 +111,15 @@ if __name__ == '__main__':
 	drawing = Drawing(
 		'test.svg',
 		10, 10,
-		Rect(-5, -5, 20, 10),
-		haling='left',
-		valing='bottom',
-		margin=0
+		Rect(-10, -3, 20, 10),
+		margin=2
 	)
 
-	drawing.setStroke(255, 0, 0)
+	drawing.setStroke(0, 0, 255)
+	drawing.drawRect(-10, -3, 20, 10)
 
-	drawing.drawRect(-5, -5, 20, 10)
+	drawing.setStroke(255, 0, 0)
+	drawing.drawRect(0, 0, 20, 20)
 	drawing.drawCircle(0, 0, 1)
 
 	drawing.save()
