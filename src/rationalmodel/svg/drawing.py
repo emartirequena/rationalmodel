@@ -39,7 +39,9 @@ class Drawing(object):
 
 		self.all.scale(1, -1)
 
-		dy = self.viewbox.y
+		dy = 0
+		if self.viewbox.width > self.viewbox.height:
+			dy = self.viewbox.y
 		self.all.translate(0, dy)
 
 		self.strokewidth = 0.1
