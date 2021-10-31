@@ -14,9 +14,14 @@ class Cell(object):
 		self.y = y
 		self.z = z
 		self.count = 0
+		base = int(pow(2, dim))
+		self.output = [0 for _ in range(base)]
 
 	def add(self):
 		self.count += 1
+
+	def addOutput(self, digit):
+		self.output[digit] += 1
 
 	def get(self):
 		pos = (self.x, )
@@ -26,7 +31,8 @@ class Cell(object):
 			pos = pos + (self.z, )
 		out = {
 			'pos': pos,
-			'count': self.count
+			'count': self.count,
+			'output': self.output
 		}
 		return out
 
@@ -63,8 +69,10 @@ class Space(object):
 		n = nx + (self.t + 1) * (ny + (self.t + 1) * nz)
 		return self.cells[int(n)]
 
-	def add(self, x, y=0.0, z=0.0):
-		self.getCell(x, y, z).add()
+	def add(self, digit, x, y=0.0, z=0.0):
+		cell = self.getCell(x, y, z)
+		cell.add()
+		cell.addOutput(digit)
 
 
 class SpaceTime(object):
@@ -76,8 +84,8 @@ class SpaceTime(object):
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
 		self.rationalSet = []
 
-	def add(self, t, x, y=0, z=0):
-		self.spaces[t].add(x, y, z)
+	def add(self, t, digit, x, y=0, z=0):
+		self.spaces[t].add(digit, x, y, z)
 
 	def getCell(self, t, x, y=0, z=0):
 		return self.spaces[t].getCell(x, y, z)
@@ -92,13 +100,14 @@ class SpaceTime(object):
 			if t + rt > self.max:
 				return
 			pos = r.position(rt, self.dim)
+			digit = r.digit(rt + 1, self.dim)
 			pos = list(pos)
 			pos[0] += x
 			if self.dim > 1:
 				pos[1] += y
 			if self.dim > 2:
 				pos[2] += z
-			self.spaces[t + rt].add(*pos)
+			self.spaces[t + rt].add(digit, *pos)
 		if t + rt < self.max:
 			self.addRationalSet(t + rt, *pos)
 	

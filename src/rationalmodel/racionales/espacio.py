@@ -1,5 +1,5 @@
-from pysvg.structure import *
-from pysvg.builders import *
+from pysvg.structure import Svg
+from pysvg.builders import ShapeBuilder
 
 from copy import deepcopy
 from racionales import Racional, c
@@ -76,7 +76,7 @@ class Espacio():
         return output
 
     def histograma2d(self, fname):
-        s = svg(height="100%", width="100%")
+        s = Svg(height="100%", width="100%")
         s.set_viewBox("0 0 1000 1000")
         oh = ShapeBuilder()
         radio = 1000.0 / (2 * self.T)
@@ -102,9 +102,9 @@ def divisores():
         for div in divs:
             esp.inicia()
             esp.anadeConjuntoRacional(div)
-            linea = '%d;' % div + esp.imprime()
+            linea = '{0:d};'.format(div + esp.imprime())
             fp.write(linea + '\n')
-            print linea
+            print (linea)
 
 def histograma2d(d, T, n):
     esp = Espacio(d, T)
@@ -114,5 +114,4 @@ def histograma2d(d, T, n):
     fname = r'C:\Users\enrique\Google Drive\Enrique\ArticuloRacionales\figuras\histograma_%02d_%08d.svg'%(esp.T, n)
     esp.histograma2d(fname)
 
-histograma2d(2, 14, 6242685)
 histograma2d(2, 14, 6242685)

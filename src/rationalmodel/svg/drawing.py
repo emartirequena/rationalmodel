@@ -1,11 +1,14 @@
-import svgwrite
-from svgwrite import rgb
 import os
 
-root = r'C:\Users\enrique\Google Drive\Enrique\ArticuloRacionales\figuras'
+import svgwrite
+from svgwrite import rgb
+
+from PySide import QtGui, QtCore, QtSvg
+
+root = r''
 
 
-class Rect(object):
+class Viewbox(object):
 	def __init__(self, x, y, width, height):
 		self.x = x
 		self.y = y
@@ -22,16 +25,24 @@ class Rect(object):
 
 
 class Drawing(object):
-	def __init__(self, name, sizex, sizey, viewbox, margin=0):
-		self.path = os.path.join(root, name)
+	def __init__(self, fname, sizex, sizey, viewbox, margin=0):
+		self.fname = fname
+		self.path = os.path.join(root, fname)
 		self.sizex = sizex
 		self.sizey = sizey
 		self.viewbox = viewbox
 		self.margin = margin
 		self.dwg = svgwrite.Drawing(
 			self.path,
-			size=('{}cm'.format(self.sizex), '{}cm'.format(self.sizey)),
-			viewBox=viewbox.getViewbox(self.margin)
+			size=('{0}px'.format(self.sizex), '{0}px'.format(self.sizey)),
+			viewBox=viewbox.getViewbox(margin)
+		)
+		self.dwg.add(
+			self.dwg.rect(
+				insert=(viewbox.x - margin, viewbox.y - margin), 
+				size=('{0}'.format(viewbox.width + 2 * margin), '{0}'.format(viewbox.height + 2 * margin)), 
+				fill='rgb(255,255,255)'
+			)
 		)
 
 		self.all = self.dwg.add(self.dwg.g(id='all'))
@@ -51,7 +62,7 @@ class Drawing(object):
 
 	def openGroup(self, name):
 		group = self.groups[-1].add(self.dwg.g(id=name))
-		self.groups.push(group)
+		self.groups.append(group)
 
 	def closeGroup(self):
 		if len(self.groups) > 1:
@@ -62,7 +73,7 @@ class Drawing(object):
 
 	def setFill(self, r, g, b):
 		self.fill = rgb(r, g, b, '%')
-
+		
 	def setDasharray(self, dasharray):
 		self.dasharray = dasharray
 
@@ -106,22 +117,32 @@ class Drawing(object):
 		)
 
 	def save(self):
-		self.dwg.save()
+		self.dwg.save(pretty=True)
+
+	def saveImage(self, imgName):
+		r = QtSvg.QSvgRenderer(QtCore.QByteArray(self.dwg.tostring()))
+		i = QtGui.QImage(self.sizex, self.sizey, QtGui.QImage.Format_RGB32)
+		p = QtGui.QPainter(i)
+		r.render(p)
+		i.save(imgName)
+		p.end()
 
 
 if __name__ == '__main__':
 	drawing = Drawing(
 		'test.svg',
-		10, 10,
-		Rect(-10, -3, 20, 10),
+		100, 100,
+		Viewbox(-10, -20, 20, 20),
 		margin=2
 	)
 
 	drawing.setStroke(0, 0, 255)
-	drawing.drawRect(-10, -3, 20, 10)
+	drawing.drawRect(-10, 0, 20, 20) 
 
 	drawing.setStroke(255, 0, 0)
-	drawing.drawRect(0, 0, 20, 20)
+	drawing.setFill(26, 128, 200)
+	drawing.drawRect(0, 0, 10, 10)
+	drawing.setFill(124, 234, 25)
 	drawing.drawCircle(0, 0, 1)
 
 	drawing.save()

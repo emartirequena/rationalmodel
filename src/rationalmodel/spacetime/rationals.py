@@ -7,6 +7,8 @@ class Rational():
         self.m = m
         self.n = n
         self.sequences = [self.getSequence(dim) for dim in range(1, 4)]
+        self.periods =[self.getPeriod(dim) for dim in range(1, 4)]
+        self.positions = [[self.getPosition(t, dim) for t in range(0, self.periods[dim - 1] + 1)] for dim in range(1, 4)]
 
     def getSequence(self, dim):
         base = int(pow(2, dim))
@@ -31,6 +33,17 @@ class Rational():
                 break
         return (digits, reminders)
 
+    def getPeriod(self, dim):
+        base = int(pow(2, dim))
+        p = 1
+        reminder = 1
+        while True:
+            reminder = (reminder * base) % self.n
+            if reminder == 1:
+                break
+            p = p + 1
+        return p
+
     def getPosition(self, t, dim=1):
         (digits, _) = self.sequences[dim - 1]
         period = len(digits)
@@ -45,11 +58,10 @@ class Rational():
             x += c - dx
             y += c - dy
             z += c - dz
-        return x, y, z
+        return (x, y, z)
 
     def period(self, dim=1):
-        digits = self.sequences[dim - 1][0]
-        return len(digits)
+        return self.periods[dim - 1]
 
     def path(self, dim=1):
         digits = self.sequences[dim - 1][0]
@@ -59,12 +71,26 @@ class Rational():
         return self.sequences[dim - 1][1]
 
     def position(self, t, dim=1):
-        x, y, z = self.getPosition(t, dim)
+        rt = 0
+        px = 0.0
+        py = 0.0
+        pz = 0.0
+        nt = int(t / self.periods[dim - 1])
+        for rt in range(nt):
+            x, y, z = self.positions[dim - 1][self.periods[dim - 1]]
+            px += x
+            py += y
+            pz += z
+        if t % self.periods[dim - 1] != 0:
+            x, y, z = self.positions[dim - 1][t % self.periods[dim - 1]]
+            px += x
+            py += y
+            pz += z
         if dim == 1:
-            return (x, )
+            return (px, )
         elif dim == 2:
-            return x, y
-        return x, y, z
+            return px, py
+        return px, py, pz
 
     def digit(self, t, dim=1):
         digits = self.sequences[dim - 1][0]
@@ -73,10 +99,8 @@ class Rational():
 
 
 if __name__ == '__main__':
-    r = Rational(1, 5)
-    print r.period(dim=1)
-    print r.path(dim=1)
-    print r.path(dim=2)
-    print r.path(dim=3)
+    r = Rational(85, 85)
+    print r.getPeriod(2)
+    print r.path(2)
     for t in range(19):
-        print t, r.position(t, dim=1), r.digit(t, dim=1)
+        print t, r.position(t, 2)
