@@ -1,10 +1,13 @@
 import os
 import time
 
+from multiprocessing import Process, Lock
+
 from rationals2 import Rational, c
 from math import pow
 import random
 
+lock = Lock()
 
 class Cell(object):
 	def __init__(self, dim, x, y=0, z=0):
@@ -87,7 +90,9 @@ class SpaceTime(object):
 			self.rationalSet.append(Rational(m, n, self.dim))
 
 	def addRational(self, r, t, x=0, y=0, z=0):
-		for rt in range(0, self.max + 1):
+		for rt in range(0, self.T + 1):
+			if t + rt > self.max:
+				return
 			pos = r.position(rt)
 			pos = list(pos)
 			pos[0] += x
@@ -96,6 +101,8 @@ class SpaceTime(object):
 			if self.dim > 2:
 				pos[2] += z
 			self.spaces[t + rt].add(*pos)
+		if t + rt < self.max:
+			self.addRationalSet(t + rt, *pos)
 	
 	def addRationalSet(self, t=0, x=0, y=0, z=0):
 		for r in self.rationalSet:
@@ -103,14 +110,14 @@ class SpaceTime(object):
 
 	def addRationalShift(self, m, n):
 		r = Rational(m, n)
-		reminders = r.reminders()
+		reminders = r.reminders(dim=self.dim)
 		for reminder in reminders:
-			self.addRational(Rational(reminder, n), 0)
+			self.addRational(Rational(reminder, n, self.dim), 0)
 
 	def addRationalRandom(self, n, num):
 		s = range(n + 1)
 		for _ in range(num):
 			m = random.choice(s)
 			s.remove(m)
-			r = Rational(m, n)
+			r = Rational(m, n, self.dim)
 			self.addRational(r, 0)

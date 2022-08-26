@@ -1,6 +1,6 @@
-from PySide import QtCore
+from PyQt5 import QtCore
 from datetime import datetime
-from functools import partial
+from functools import cmp_to_key, partial
 import time
 
 
@@ -56,16 +56,10 @@ class TaskQueue(object):
             return 1
         if a.priority > b.priority:
             return -1
-        if a.last_first == b.last_first:
-            if a.time < b.time:
-                return -1
-            elif a.time > b.time:
-                return 1
-        else:
-            if a.time < b.time:
-                return 1
-            elif a.time > b.time:
-                return -1
+        if a.time < b.time:
+            return 1
+        if a.time > b.time:
+            return -1
         return 0
 
     def put(self, priority, func, *args, **kwargs):
@@ -82,6 +76,7 @@ class TaskQueue(object):
         QtCore.QMutexLocker(self.mutex)
         task = Task(priority, func, *args, **kwargs)
         self.queue.append(task)
+        # self.queue.sort(key=cmp_to_key(self.order))
 
     def get(self):
         """Gets a task from the queue.

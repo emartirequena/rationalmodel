@@ -3,7 +3,7 @@ import os
 import svgwrite
 from svgwrite import rgb
 
-from PySide import QtGui, QtCore, QtSvg
+from PySide2 import QtGui, QtCore, QtSvg
 
 root = r''
 
@@ -120,7 +120,7 @@ class Drawing(object):
 		self.dwg.save(pretty=True)
 
 	def saveImage(self, imgName):
-		r = QtSvg.QSvgRenderer(QtCore.QByteArray(self.dwg.tostring()))
+		r = QtSvg.QSvgRenderer(QtCore.QByteArray(self.dwg.tostring().encode('ascii')))
 		i = QtGui.QImage(self.sizex, self.sizey, QtGui.QImage.Format_RGB32)
 		p = QtGui.QPainter(i)
 		r.render(p)

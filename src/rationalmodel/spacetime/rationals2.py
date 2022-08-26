@@ -3,15 +3,16 @@ c = 0.5
 
 
 class Rational():
-    def __init__(self, m, n):
+    def __init__(self, m, n, dim=1):
         self.m = m
         self.n = n
-        self.sequences = [self.getSequence(dim) for dim in range(1, 4)]
-        self.periods =[self.getPeriod(dim) for dim in range(1, 4)]
-        self.positions = [[self.getPosition(t, dim) for t in range(0, self.periods[dim - 1] + 1)] for dim in range(1, 4)]
+        self.dim = dim
+        self.sequences = self.getSequence()
+        self.period =self.getPeriod()
+        self.positions = [self.getPosition(t) for t in range(0, self.period + 1)]
 
-    def getSequence(self, dim):
-        base = int(pow(2, dim))
+    def getSequence(self):
+        base = int(pow(2, self.dim))
         if self.m == 0:
             reminders = [0]
             digits = [0]
@@ -33,8 +34,8 @@ class Rational():
                 break
         return (digits, reminders)
 
-    def getPeriod(self, dim):
-        base = int(pow(2, dim))
+    def getPeriod(self):
+        base = int(pow(2, self.dim))
         p = 1
         reminder = 1
         while True:
@@ -44,8 +45,8 @@ class Rational():
             p = p + 1
         return p
 
-    def getPosition(self, t, dim=1):
-        (digits, _) = self.sequences[dim - 1]
+    def getPosition(self, t):
+        (digits, _) = self.sequences
         period = len(digits)
         x = 0.0
         y = 0.0
@@ -60,38 +61,38 @@ class Rational():
             z += c - dz
         return (x, y, z)
 
-    def period(self, dim=1):
-        return self.periods[dim - 1]
+    def period(self):
+        return self.period
 
-    def path(self, dim=1):
-        digits = self.sequences[dim - 1][0]
+    def path(self):
+        digits = self.sequences[0]
         return ''.join([str(d) for d in digits])
 
-    def reminders(self, dim=1):
-        return self.sequences[dim - 1][1]
+    def reminders(self):
+        return self.sequences[1]
 
-    def position(self, t, dim=1):
+    def position(self, t):
         px = 0.0
         py = 0.0
         pz = 0.0
-        nt = int(t / self.periods[dim - 1])
+        nt = int(t / self.period)
         for _ in range(nt):
-            x, y, z = self.positions[dim - 1][self.periods[dim - 1]]
+            x, y, z = self.positions[self.period]
             px += x
             py += y
             pz += z
-        if t % self.periods[dim - 1] != 0:
-            x, y, z = self.positions[dim - 1][t % self.periods[dim - 1]]
+        if t % self.period != 0:
+            x, y, z = self.positions[t % self.period]
             px += x
             py += y
             pz += z
-        if dim == 1:
+        if self.dim == 1:
             return (px, )
-        elif dim == 2:
+        elif self.dim == 2:
             return px, py
         return px, py, pz
 
-    def digit(self, t, dim=1):
-        digits = self.sequences[dim - 1][0]
+    def digit(self, t):
+        digits = self.sequences[0]
         T = len(digits)
         return digits[t % T]

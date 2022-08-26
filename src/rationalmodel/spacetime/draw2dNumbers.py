@@ -44,13 +44,13 @@ def draw2dNumber(T, n, fname):
 
 
 def draw2dSpace(T, nt, n, fname):
-    print 'Computing spacetime...'
+    print ('Computing spacetime...')
     spacetime = SpaceTime(T, nt, dim=2)
     spacetime.setRationalSet(n)
     spacetime.addRationalSet()
 
     for t in range(0, nt+1):
-        print t
+        print (t)
         space = spacetime.spaces[t]
 
         max = -1
@@ -63,7 +63,7 @@ def draw2dSpace(T, nt, n, fname):
         drawing = Drawing(
             fname,
             1000, 1000,
-            Viewbox(-c*t, -c*t, t, t),
+            Viewbox(-c*t, -c*t, t, t),	
             margin=2
         )
         drawing.setFill(0, 0, 0)
@@ -104,7 +104,7 @@ def drawPeriod(T):
 		os.mkdir(path)
 	nums = divisors(4**T-1)
 	for num in nums[1:]:
-		print num
+		print (num)
 		draw2dNumber(T, num, os.path.join(path, '{0}_{1}.jpg'.format(T, num)))
 
 
@@ -134,4 +134,4 @@ if __name__ == '__main__':
 	# if not os.path.exists(path):
 	# 	os.mkdir(path)
 	# draw2dSpace(7, 28, num, path)
-	drawNumber(127, 7, 28)
+	drawNumber(87, 14, 42)
