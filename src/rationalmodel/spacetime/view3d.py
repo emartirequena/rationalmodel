@@ -7,7 +7,7 @@ from PyQt5.QtCore import Qt
 from madcad import *
 
 from spacetime import SpaceTime
-from spacetime2 import SpaceTime as SpaceTimeRedifussion
+from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
 from utils import divisors, factorGenerator
 
 settings_file = r'settings.txt'
