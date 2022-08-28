@@ -1,7 +1,7 @@
 import os
 import sys
 import math
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtCore
 from PyQt5.QtCore import Qt
 
 from madcad import *
@@ -20,6 +20,28 @@ def colorBlend(a, b, alpha):
     return vec3(r, g, b)
 
 
+class MainView(rendering.View):
+    def __init__(self, mainWindow, scene, parent=None):
+        self.mainWindow = mainWindow
+        super().__init__(scene, parent=parent)
+
+    def inputEvent(self, event):
+        if event.type() == 3:
+            obj = self.itemat(QtCore.QPoint(event.x(), event.y()))
+            if obj:
+                center = self.scene.item(obj).box.center
+                t = self.mainWindow.timeWidget.value()
+                spacetime = self.mainWindow.spacetime
+                cell = spacetime.getCell(t, center.x, center.y, center.z)
+                max = self.mainWindow.num if self.mainWindow.num else 1
+                percent = 100.0 * float(cell.count)/float(max)
+                text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
+                print(text)
+                self.mainWindow.setStatus(text)
+        else:
+            super().inputEvent(event)
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -31,9 +53,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.showMaximized()
         self.spacetime = None
         self.factors = ''
+        self.num = 0
 
     def setUpUi(self):
         self.resize(1000, 700)
+
         self.mainLayout = QtWidgets.QHBoxLayout()
         self.leftLayout = QtWidgets.QVBoxLayout()
         self.rightLayout = QtWidgets.QVBoxLayout()
@@ -120,18 +144,32 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(self.central)
         self.central.setLayout(self.mainLayout)
 
+        self.statusBar = QtWidgets.QStatusBar(self)
+        self.statusLabel = QtWidgets.QLabel()
+        self.statusBar.addWidget(self.statusLabel)
+        self.setStatusBar(self.statusBar)
+
+    def setStatus(self, txt: str):
+        print(type(txt))
+        print(txt)
+        self.statusLabel.setText(str(txt))
+        self.statusBar.show()
+    
     def compute(self):
-        print('Creating spacetime...')
+        
+        self.setStatus(f'Creating spacetime...')
         if self.redifussion.isChecked():
             self.spacetime = SpaceTimeRedifussion(self.period.value(), self.maxTime.value(), dim=3)
         else:
             self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
 
-        print('Setting rational set for number:', self.number.value())
+        self.setStatus(f'Setting rational set for number: {self.number.value()} ...')
         self.spacetime.setRationalSet(self.number.value())
-        print('Adding rational set...')
+
+        self.setStatus(f'Adding rational set...')
         self.spacetime.addRationalSet()
         self.timeWidget.setValue(self.maxTime.value())
+        
         self.make_objects()
 
     def make_objects(self):
@@ -144,8 +182,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.objs = []
 
-        print('Drawing frame:', time)
+        self.setStatus(f'Drawing frame: {time} ...')
 
+        self.num = 0
         max = -1
         count = 0
         for i in range(len(space.cells)):
@@ -155,7 +194,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 max = num
             if cell['count']:
                 count += 1
-        print('Num spheres:', count)
+                self.num += cell['count']
+        self.setStatus(f'Num spheres: {count}')
 
         for i in range(len(space.cells)):
             cell = space.cells[i].get()
@@ -175,7 +215,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self.objs.append(sphere)
 
-        print('Drwaing completed...')
+        self.setStatus(f'Drawing completed...')
 
         axisX = Axis(vec3(0), X)
         axisY = Axis(vec3(0), Y)
@@ -188,26 +228,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if isinstance(self.objs, list):
             self.objs = dict(enumerate([self.objs]))
-        print('Objects list created...')
+        self.setStatus(f'Objects list created...')
     
         self.make_view()
 
     def make_view(self):
         if self.view and len(self.view.scene.displays):
             while len(self.view.scene.displays):
-                obj = self.view.scene.displays.pop(0)
-                del obj
+                try:
+                    obj = self.view.scene.displays.pop(0)
+                    del obj
+                except:
+                    pass
             self.view.scene.update(self.objs)
             self.view.scene.render(self.view)
             self.view.update()
         else:
             scene = rendering.Scene(self.objs, options=None)
             self.viewLayout.takeAt(0)
-            self.view = rendering.View(scene, parent=self.central)
+            self.view = MainView(self, scene, parent=self.central)
             self.viewLayout.addWidget(self.view)
             self.view.show()
             self.view.center()
             self.view.adjust(scene.box())
+        
+        # self.setStatus(f'')
 
     def get_factors(self, n):
         factors = factorGenerator(n)
@@ -222,11 +267,11 @@ class MainWindow(QtWidgets.QMainWindow):
         return label
 
     def get_period_factors(self, T):
-        label = self.get_factors(pow(8, T)-1)
+        label = self.get_factors(pow(8, T) - 1)
         self.factorsLabel.setText(label)
 
     def fillDivisors(self, T):
-        numbers = divisors(pow(8, T)-1)
+        numbers = divisors(pow(8, T) - 1)
         self.divisors.clear()
         self.divisors.addItems([str(x) + ' = ' + self.get_factors(x) for x in numbers])
 
