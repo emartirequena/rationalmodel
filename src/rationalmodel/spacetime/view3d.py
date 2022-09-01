@@ -150,14 +150,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatusBar(self.statusBar)
 
     def setStatus(self, txt: str):
-        print(type(txt))
         print(txt)
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
+        global app
+        app.processEvents()
     
     def compute(self):
         
-        self.setStatus(f'Creating spacetime...')
+        self.setStatus('Creating spacetime...')
         if self.redifussion.isChecked():
             self.spacetime = SpaceTimeRedifussion(self.period.value(), self.maxTime.value(), dim=3)
         else:
@@ -166,7 +167,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus(f'Setting rational set for number: {self.number.value()} ...')
         self.spacetime.setRationalSet(self.number.value())
 
-        self.setStatus(f'Adding rational set...')
+        self.setStatus('Adding rational set...')
         self.spacetime.addRationalSet()
         self.timeWidget.setValue(self.maxTime.value())
         
@@ -215,7 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             self.objs.append(sphere)
 
-        self.setStatus(f'Drawing completed...')
+        self.setStatus('Drawing completed...')
 
         axisX = Axis(vec3(0), X)
         axisY = Axis(vec3(0), Y)
@@ -228,7 +229,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if isinstance(self.objs, list):
             self.objs = dict(enumerate([self.objs]))
-        self.setStatus(f'Objects list created...')
+        self.setStatus('Objects list created...')
     
         self.make_view()
 
