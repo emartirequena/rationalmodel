@@ -1,7 +1,7 @@
 import os
 import sys
 import math
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import Qt
 
 from madcad import *
@@ -46,6 +46,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setUpUi()
+        self.list_objs_objs = []
         self.objs = []
         settings.load(os.path.join(os.path.dirname(__file__), settings_file))
         self.view = None
@@ -149,6 +150,18 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.statusLabel)
         self.setStatusBar(self.statusBar)
 
+    def keyPressEvent(self, a0: QtGui.QKeyEvent) -> None:
+        print(f'key pressed {a0.key()}')
+        if a0.key() == QtCore.Qt.Key.Key_Left:
+            t = self.timeWidget.value()
+            if t > 0:
+                self.timeWidget.setValue(t-1)
+        elif a0.key() == QtCore.Qt.Key.Key_Right:
+            t = self.timeWidget.value()
+            if t < self.maxTime.value():
+                self.timeWidget.setValue(t+1)
+        return super().keyPressEvent(a0)
+
     def setStatus(self, txt: str):
         print(txt)
         self.statusLabel.setText(str(txt))
@@ -181,7 +194,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         space = self.spacetime.spaces[time]
 
-        self.objs = []
+        self.list_objs = []
 
         self.setStatus(f'Drawing frame: {time} ...')
 
@@ -214,33 +227,24 @@ class MainWindow(QtWidgets.QMainWindow):
             sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(20 * math.pow(rad, 0.2))))
             sphere.option(color=color)
 
-            self.objs.append(sphere)
-
-        self.setStatus('Drawing completed...')
+            self.list_objs.append(sphere)
 
         axisX = Axis(vec3(0), X)
         axisY = Axis(vec3(0), Y)
         axisZ = Axis(vec3(0), Z)
-        self.objs.append([axisX, axisY, axisZ])
+        self.list_objs.append([axisX, axisY, axisZ])
 
         cube = Box(center=vec3(0), width=time)
+        self.list_objs.append(cube)
 
-        self.objs.append(cube)
-
-        if isinstance(self.objs, list):
-            self.objs = dict(enumerate([self.objs]))
-        self.setStatus('Objects list created...')
+        if isinstance(self.list_objs, list):
+            self.objs = dict(enumerate([self.list_objs]))
     
         self.make_view()
 
     def make_view(self):
         if self.view and len(self.view.scene.displays):
-            while len(self.view.scene.displays):
-                try:
-                    obj = self.view.scene.displays.pop(0)
-                    del obj
-                except:
-                    pass
+            self.view.scene.displays.clear()
             self.view.scene.update(self.objs)
             self.view.scene.render(self.view)
             self.view.update()
@@ -252,9 +256,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.show()
             self.view.center()
             self.view.adjust(scene.box())
+        self.setStatus('Objects list created...')
         
-        # self.setStatus(f'')
-
     def get_factors(self, n):
         factors = factorGenerator(n)
         labels = []
