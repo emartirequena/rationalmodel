@@ -1,6 +1,3 @@
-import os
-import time
-
 from rationals2 import Rational, c
 from math import pow
 import random

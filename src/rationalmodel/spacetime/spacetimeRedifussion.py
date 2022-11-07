@@ -1,13 +1,7 @@
-import os
-import time
-
-from multiprocessing import Process, Lock
-
 from rationals2 import Rational, c
 from math import pow
 import random
 
-lock = Lock()
 
 class Cell(object):
 	def __init__(self, dim, x, y=0, z=0):
