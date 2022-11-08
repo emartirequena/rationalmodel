@@ -108,7 +108,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setUpUi()
-        self.objs = []
+        self.objs = dict()
+        self.list_objs = list()
         self.view = None
         self.getConfig()
         self.make_view()
@@ -291,7 +292,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.rendering = True
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
-        objs = deepcopy(self.objs)
+        time = self.timeWidget.value()
+        objs = deepcopy(self.make_objects(time=time, make_view=False))
         scene = rendering.Scene(objs)
         scene.ctx = create_standalone_context()
         scene.ctx.multisample = False
@@ -302,13 +304,12 @@ class MainWindow(QtWidgets.QMainWindow):
         img = screen.render()
         number = self.number.value()
         period = self.period.value()
-        time = self.time.value()
         base_path  = os.path.join(image_path, f'P{period}')
         if not os.path.exists(base_path):
             os.makedirs(base_path)
         path = os.path.join(base_path, f'N{number}')
         if not os.path.exists(path):
-            os.makdirs(path)
+            os.makedirs(path)
         img.save(os.path.join(path, f'P{period:02d}_N{number}.{time:04d}.png'))
         del objs
         del projection
@@ -344,7 +345,7 @@ class MainWindow(QtWidgets.QMainWindow):
         scene.ctx.blend_equation = mgl.FUNC_ADD
         screen = rendering.Offscreen(scene, size=(self.view.width(), self.view.height()), projection=projection, navigation=navigation)
         for time in range(self.maxTime.value() + 1):
-            objs = self.make_objects(time=time, make_view=False)
+            objs = deepcopy(self.make_objects(time=time, make_view=False))
             scene.displays.clear()
             scene.add(objs)
             img = screen.render()
