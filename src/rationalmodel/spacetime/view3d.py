@@ -1,22 +1,21 @@
+import json
+import math
+import shutil
 import subprocess
 import sys
-import shutil
-import json
-
-import math
-from tokenize import Double
-from PyQt5 import QtWidgets, QtCore, QtGui
-from PyQt5.QtCore import Qt
 from copy import deepcopy
+from tokenize import Double
+import typing
 
 import moderngl as mgl
-from moderngl.context import create_standalone_context
 from madcad import *
-
-from spacetime import SpaceTime
+from moderngl.context import create_standalone_context
+from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtCore import Qt
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
 from utils import divisors, factorGenerator
 
+from spacetime import SpaceTime
 
 image_path = ''
 video_path = ''
@@ -27,6 +26,7 @@ video_codec = 'prores'
 video_format = 'mov'
 settings_file = r'settings.txt'
 config_file = r'config.json'
+validations = 0
 
 opengl_version = (3,3)
 
@@ -102,6 +102,18 @@ class MainView(rendering.View):
                 self.mainWindow.setStatus(text)
         else:
             super().inputEvent(event)
+
+class Number(QtWidgets.QSpinBox):
+    def __init__(self, parent=None):
+        QtWidgets.QSpinBox.__init__(self, parent=parent)
+        
+    def validate(self, input, pos):
+        num = int(input) if input else 0
+        if self.parent().parent().validate_number(num, self.parent().parent().period.value()):
+            print('is valid')
+            return (QtGui.QValidator.State.Acceptable, input, num)
+        print('is invalid')
+        return (QtGui.QValidator.State.Invalid, input, num)
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -198,6 +210,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.number = QtWidgets.QSpinBox(self)
         self.number.setMinimum(0)
         self.number.setMaximum(2147483647)
+        self.number.editingFinished.connect(self.validate_number)
         self.gridLayout.addWidget(self.number, 2, 1)
 
         self.label4 = QtWidgets.QLabel('Factors')
@@ -286,7 +299,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar.show()
         global app
         app.processEvents()
-    
+
+    def makePath(self, period, number):
+        factors = self.get_output_factors(number)        
+        base_path  = os.path.join(image_path, f'P{period}')
+        if not os.path.exists(base_path):
+            os.makedirs(base_path)
+        path = os.path.join(base_path, f'N{number}_F{factors}')
+        if not os.path.exists(path):
+            os.makedirs(path)
+        return path
+
     def saveImage(self):
         self.setStatus('Saving image...')
         self.rendering = True
@@ -300,17 +323,13 @@ class MainWindow(QtWidgets.QMainWindow):
         scene.ctx.enable_only(mgl.DEPTH_TEST)
         scene.ctx.blend_func = mgl.ONE, mgl.ZERO
         scene.ctx.blend_equation = mgl.FUNC_ADD
-        screen = rendering.Offscreen(scene, size=(self.view.width(), self.view.height()), projection=projection, navigation=navigation)
+        screen = rendering.Offscreen(scene, size=(video_resx, video_resy), projection=projection, navigation=navigation)
         img = screen.render()
         number = self.number.value()
         period = self.period.value()
-        base_path  = os.path.join(image_path, f'P{period}')
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
-        path = os.path.join(base_path, f'N{number}')
-        if not os.path.exists(path):
-            os.makedirs(path)
-        img.save(os.path.join(path, f'P{period:02d}_N{number}.{time:04d}.png'))
+        factors = self.get_output_factors(number)
+        path = self.makePath(period, number)
+        img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
         del objs
         del projection
         del navigation
@@ -329,34 +348,30 @@ class MainWindow(QtWidgets.QMainWindow):
         
         number = self.number.value()
         period = self.period.value()
+        factors = self.get_output_factors(number)
         
-        base_path  = os.path.join(image_path, f'P{period}')
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
-        path = os.path.join(base_path, f'N{number}')
-        if not os.path.exists(path):
-            os.makedirs(path)
+        path = self.makePath(period, number)
         
         scene = rendering.Scene()
         scene.ctx = create_standalone_context()
-        scene.ctx.multisample = False
+        scene.ctx.multisample = True
         scene.ctx.enable_only(mgl.DEPTH_TEST)
         scene.ctx.blend_func = mgl.ONE, mgl.ZERO
         scene.ctx.blend_equation = mgl.FUNC_ADD
-        screen = rendering.Offscreen(scene, size=(self.view.width(), self.view.height()), projection=projection, navigation=navigation)
+        screen = rendering.Offscreen(scene, size=(video_resx, video_resy), projection=projection, navigation=navigation)
         for time in range(self.maxTime.value() + 1):
             objs = deepcopy(self.make_objects(time=time, make_view=False))
             scene.displays.clear()
             scene.add(objs)
             img = screen.render()
-            img.save(os.path.join(path, f'P{period:02d}_N{number}.{time:04d}.png'))
+            img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             del objs
         del projection
         del navigation
         del scene
         del screen
         
-        in_sequence = os.path.join(path, f'P{period:02d}_N{number}.%04d.png')
+        in_sequence = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
         out_factors = self.get_output_factors(number)
         video_file_name = f'P{period:02d}_N{number}_F{out_factors}.{video_format}'
         out_video = os.path.join(path, video_file_name)
@@ -383,6 +398,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus('Sequence saved...')
 
     def compute(self):
+
+        if self.number.value() == 0:
+            return
         
         self.setStatus('Creating ..')
         self.rendering = True
@@ -404,6 +422,10 @@ class MainWindow(QtWidgets.QMainWindow):
         
     def make_objects(self, time:int=0, make_view:bool=True):
         self.rendering = True
+
+        if self.list_objs:
+            for obj in self.list_objs:
+                del obj
 
         if not self.spacetime:
             return
@@ -503,6 +525,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         label = '_'.join(labels)
         return label
+
+    def validate_number(self):
+        numbers = divisors(pow(8, self.period.value()) - 1)
+        if self.number.value() not in numbers:
+            QtWidgets.QMessageBox.critical(self, 'ERROR', F'{self.number.value()} is not a divisor')
 
     def get_period_factors(self, T):
         label = self.get_factors(pow(8, T) - 1)
