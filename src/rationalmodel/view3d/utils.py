@@ -55,8 +55,19 @@ def divisors(n: int):
     divisors.sort()
     return divisors
 
+def getPeriod(n: int, base: int):
+    print(f'getPeriod({n}, {base})')
+    if n == 1:
+        return 1
+    reminder = 1
+    p = 1
+    while True:
+        reminder = (reminder * base) % n
+        if reminder == 1:
+            break
+        p = p + 1
+    return p
+
 
 if __name__ == '__main__':
-    a: int = 8
-    b: int = 18
-    print(primefactors(a**b - 1))
+    print(getPeriod(1, 8))

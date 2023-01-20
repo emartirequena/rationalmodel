@@ -1,5 +1,6 @@
-import numpy
 from rationals2 import Rational, c
+from math import pow
+import random
 
 
 class Cell(object):
@@ -30,7 +31,7 @@ class Space(object):
 	def __init__(self, t, dim):
 		self.t = t
 		self.dim = dim
-		self.base = int(numpy.power(2, dim))
+		self.base = int(pow(2, dim))
 		self.cells = []
 		if self.dim == 1:
 			for nx in range(t + 1):
@@ -67,7 +68,7 @@ class SpaceTime(object):
 		self.T = T
 		self.max = max
 		self.dim = dim
-		self.base = int(numpy.power(2, dim))
+		self.base = int(pow(2, dim))
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
 		self.rationalSet = []
 
@@ -77,13 +78,15 @@ class SpaceTime(object):
 	def getCell(self, t, x, y=0, z=0):
 		return self.spaces[t].getCell(x, y, z)
 
-	def setRationalSet(self, n: numpy.longlong):
+	def setRationalSet(self, n):
 		self.rationalSet = []
 		for m in range(n + 1):
 			self.rationalSet.append(Rational(m, n, self.dim))
 
 	def addRational(self, r, t, x=0, y=0, z=0):
-		for rt in range(0, self.max + 1):
+		for rt in range(0, self.T + 1):
+			if t + rt > self.max:
+				return
 			pos = r.position(rt)
 			pos = list(pos)
 			pos[0] += x
@@ -92,7 +95,23 @@ class SpaceTime(object):
 			if self.dim > 2:
 				pos[2] += z
 			self.spaces[t + rt].add(*pos)
+		if t + rt < self.max:
+			self.addRationalSet(t + rt, *pos)
 	
 	def addRationalSet(self, t=0, x=0, y=0, z=0):
 		for r in self.rationalSet:
 			self.addRational(r, t, x, y, z)
+
+	def addRationalShift(self, m, n):
+		r = Rational(m, n)
+		reminders = r.reminders(dim=self.dim)
+		for reminder in reminders:
+			self.addRational(Rational(reminder, n, self.dim), 0)
+
+	def addRationalRandom(self, n, num):
+		s = range(n + 1)
+		for _ in range(num):
+			m = random.choice(s)
+			s.remove(m)
+			r = Rational(m, n, self.dim)
+			self.addRational(r, 0)
