@@ -26,12 +26,10 @@ def primefactors(n: int) -> list[int]:
     limit:numpy.longdouble = numpy.longdouble(numpy.sqrt([n]))[0]
     while i <= limit:
         if n % i == 0:
-            print(n, i)
             l = primefactors(int(n / i))
             l.append(i)
             return l
         i+=1
-    print(n, type(n))
     return [n]      # n is prime
 
 def factorGenerator(n: int):

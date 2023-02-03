@@ -13,7 +13,7 @@ from moderngl.context import create_standalone_context
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
-from utils import divisors, factorGenerator, getPeriod
+from utils import divisors, factorGenerator, getPeriod, primefactors
 
 from spacetime import SpaceTime
 
@@ -548,7 +548,15 @@ class MainWindow(QtWidgets.QMainWindow):
             txt = f'{x} ({period}) = {self.get_factors(x)}'
             item = QtWidgets.QListWidgetItem(txt)
             if period != T:
-                item.setForeground(QtGui.QBrush(Qt.red))
+                factors = primefactors(x)
+                if len(factors) == 1:
+                    item.setForeground(QtGui.QBrush(Qt.darkRed))
+                else:
+                    item.setForeground(QtGui.QBrush(Qt.red))
+            else:
+                factors = primefactors(x)
+                if len(factors) == 1:
+                    item.setForeground(QtGui.QBrush(Qt.blue))
             self.divisors.addItem(item)
                 
     def setNumber(self, index):
