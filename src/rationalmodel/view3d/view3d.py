@@ -132,13 +132,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.num = 0
         self.rendering = False
         self.color = ColorLine()
-        self.color.add(0.0, vec3(0.0, 0.0, 0.0))
-        self.color.add(0.1, vec3(0.2, 0.2, 1.0))
-        self.color.add(0.2, vec3(0.7, 0.3, 0.4))
-        self.color.add(0.4, vec3(0.5, 0.7, 0.5))
-        self.color.add(0.7, vec3(0.7, 0.5, 0.3))
-        self.color.add(1.0, vec3(1.0, 0.5, 0.2))
-
+        self.color.add(0.0,  vec3(0.2, 0.2, 1.0))
+        self.color.add(0.05, vec3(0.7, 0.3, 0.4))
+        self.color.add(0.4,  vec3(0.5, 0.7, 0.5))
+        self.color.add(0.7,  vec3(0.7, 0.5, 0.3))
+        self.color.add(1.0,  vec3(1.0, 0.5, 0.2))
+        
     def getConfig(self):
         global image_path, video_path, ffmpeg_path, video_resx, video_resy, video_codec, video_format
         settings.load(settings_file)
