@@ -1,9 +1,9 @@
 {
-    "image_path": "C:\\Users\\emart\\OneDrive\\Documentos\\Enrique\\rationalmodel\\images",
-    "video_path": "C:\\Users\\emart\\OneDrive\\Documentos\\Enrique\\rationalmodel\\videos",
+    "image_path": "C:\\users\\enrique\\onedrive\\documentos\\enrique\\rationalmodel\\images",
+    "video_path": "C:\\users\\enrique\\onedrive\\documentos\\enrique\\rationalmodel\\videos",
     "ffmpeg_path": "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
     "video_resx": 1920,
     "video_resy": 1080,
-    "video_codec": "prores",
-    "video_format": "mov"
+    "video_codec": "mpeg4",
+    "video_format": "mpeg"
 }
