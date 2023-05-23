@@ -1,3 +1,4 @@
+import os
 import numpy
 import json
 import math
@@ -8,8 +9,8 @@ from copy import deepcopy
 from tokenize import Double
 
 import moderngl as mgl
-from madcad import *
-from moderngl.context import create_standalone_context
+from madcad import mathutils, vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
+from moderngl import create_standalone_context
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
