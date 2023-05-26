@@ -3,7 +3,7 @@ c = 0.5
 
 
 class Rational():
-    def __init__(self, m: numpy.longlong, n: numpy.longlong, dim=1):
+    def __init__(self, m: int, n: int, dim=1):
         self.m = m
         self.n = n
         self.dim = dim
@@ -24,18 +24,18 @@ class Rational():
         digits = []
         reminders = []
         reminder = self.m
-        digit = int(reminder * base / float(self.n))
+        digit = reminder * base // self.n
         while True:
             digits.append(digit)
             reminders.append(reminder)
             reminder = (reminder * base) % self.n
-            digit = int(reminder * base / float(self.n))
+            digit = reminder * base // self.n
             if reminder == self.m:
                 break
         return (digits, reminders)
 
     def getPeriod(self):
-        base = int(pow(2, self.dim))
+        base = 2**self.dim
         p = 1
         reminder = 1
         while True:
@@ -54,8 +54,8 @@ class Rational():
         for i in range(t):
             digit = digits[i % period]
             dx = (digit % 2)
-            dy = (int(digit / 2) % 2)
-            dz = (int(digit / 4) % 2)
+            dy = (digit // 2) % 2
+            dz = (digit // 4) % 2
             x += c - dx
             y += c - dy
             z += c - dz
@@ -75,7 +75,7 @@ class Rational():
         px = 0.0
         py = 0.0
         pz = 0.0
-        nt = int(t / self.period)
+        nt = t // self.period
         for _ in range(nt):
             x, y, z = self.positions[self.period]
             px += x

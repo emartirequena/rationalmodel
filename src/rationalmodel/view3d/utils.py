@@ -1,6 +1,5 @@
-import numpy
 from functools import reduce
-from collections import OrderedDict as odict
+from copy import copy
 
 def appendEs2Sequences(sequences, es):
     result=[]
@@ -12,7 +11,7 @@ def appendEs2Sequences(sequences, es):
             result+=[seq+[e] for seq in sequences]
     return result
 
-def cartesianproduct(lists):
+def cartesianproduct(lists) :
     """
     given a list of lists,
     returns all the possible combinations taking one element from each list
@@ -22,28 +21,28 @@ def cartesianproduct(lists):
 
 def primefactors(n: int) -> list[int]:
     """lists prime factors, from greatest to smallest"""
-    i:int = 2
-    limit:numpy.longdouble = numpy.longdouble(numpy.sqrt([n]))[0]
+    i:int = 3
+    limit:int = n // (4096 if n >= 100000000 else 4)
     while i <= limit:
         if n % i == 0:
-            l = primefactors(int(n / i))
-            l.append(i)
-            return l
-        i+=1
+            lst: list[int] = primefactors(n // i)
+            lst.append(i)
+            return lst
+        i+=2
     return [n]      # n is prime
 
-def factorGenerator(n: int):
+def factorGenerator(n: int) -> dict:
     p = primefactors(n)
-    factors=odict()
+    factors= dict()
     for p1 in p:
         try:
             factors[p1]+=1
         except KeyError:
             factors[p1]=1
-    factors = odict(sorted(factors.items(), key=lambda t:t[0]))
+    factors = dict(sorted(factors.items(), key=lambda t:t[0]))
     return factors
 
-def divisors(n: int):
+def divisors(n: int) -> list[int]:
     factors = factorGenerator(n)
     divisors: list[int] = []
     listexponents: list[int] = [list(map(lambda x:int(k**x),range(0, factors[k]+1))) for k in factors.keys()]
@@ -53,8 +52,40 @@ def divisors(n: int):
     divisors.sort()
     return divisors
 
-def getPeriod(n: int, base: int):
-    print(f'getPeriod({n}, {base})')
+def getExponents(factors: dict, exponents: list[int]) -> dict:
+    out: dict = copy(factors)
+    keys: list = list(factors.keys())
+    for index in range(0, len(exponents)):
+        e: int = exponents[index]
+        if e == 1:
+            out[keys[index]] = 0
+        else:
+            r: int = e
+            for factor in range(0, factors[keys[index]] + 1):
+                r = r // keys[index]
+                if r == 1:
+                    break
+            out[keys[index]] = factor + 1
+    return out
+
+def getDivisorsAndFactors(n: int, base: int) -> list[dict]:
+    factors = factorGenerator(n)
+    divisors: list[int] = []
+    listexponents: list[list[int]] = [list(map(lambda x:int(k**x),range(0, factors[k]+1))) for k in factors.keys()]
+    listfactors: list[list[int]] = cartesianproduct(listexponents)
+    for f in listfactors:
+        number: int = reduce(lambda x, y: int(x*y), f, 1)
+        record: dict = {
+            'number': number,
+            'period': getPeriod(number, base),
+            'factors': getExponents(factors, listfactors[listfactors.index(f)])
+        }
+        divisors.append(record)
+    divisors.sort(key=lambda x: x['number'])
+    return divisors
+
+def getPeriod(n: int, base: int) -> int:
+    # print(f'getPeriod({n}, {base})')
     if n == 1:
         return 1
     reminder = 1
@@ -68,4 +99,4 @@ def getPeriod(n: int, base: int):
 
 
 if __name__ == '__main__':
-    print(getPeriod(1, 8))
+    getDivisorsAndFactors(8**23-1, 8)

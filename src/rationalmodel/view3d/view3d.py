@@ -1,5 +1,4 @@
 import os
-import numpy
 import json
 import math
 import shutil
@@ -14,7 +13,7 @@ from moderngl import create_standalone_context
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
-from utils import divisors, factorGenerator, getPeriod, primefactors
+from utils import getDivisorsAndFactors, divisors
 
 from spacetime import SpaceTime
 
@@ -131,6 +130,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.spacetime = None
         self.factors = ''
         self.num = 0
+        self.numbers = []
         self.rendering = False
         self.color = ColorLine()
         self.color.add(0.0,  vec3(0.2, 0.2, 1.0))
@@ -194,7 +194,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.period.setMinimum(1)
         self.period.setMaximum(100)
         self.period.valueChanged.connect(self.get_period_factors)
-        self.period.valueChanged.connect(self.fillDivisors)
         self.gridLayout.addWidget(self.period, 0, 1)
 
         self.label2 = QtWidgets.QLabel('Max Time')
@@ -413,7 +412,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
 
         self.setStatus(f'Setting rational set for number: {self.number.value()} ...')
-        self.spacetime.setRationalSet(numpy.longlong(self.number.value()))
+        self.spacetime.setRationalSet(int(self.number.value()))
 
         self.setStatus('Adding rational set...')
         self.spacetime.addRationalSet()
@@ -504,11 +503,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus('Objects list created...')
         self.rendering = False
         
-    def get_factors(self, n):
-        factors = factorGenerator(n)
+    def get_factors(self, factors):
         labels = []
-        for factor in factors:
-            if factors[factor] == 1:
+        for factor in factors.keys():
+            if factors[factor] == 0:
+                continue
+            elif factors[factor] == 1:
                 labels.append(str(factor))
             else:
                 labels.append(str(factor) + '^' + str(factors[factor]))
@@ -516,48 +516,52 @@ class MainWindow(QtWidgets.QMainWindow):
         label = ', '.join(labels)
         return label
 
-    def get_output_factors(self, n):
-        factors = factorGenerator(n)
+    def get_output_factors(self, factors):
         labels = []
-        for factor in factors:
-            if factors[factor] == 1:
+        for factor in factors.keys():
+            if factors[factor] == 0:
+                continue
+            elif factors[factor] == 1:
                 labels.append(str(factor))
             else:
                 labels.append(str(factor) + '^' + str(factors[factor]))
-
         label = '_'.join(labels)
         return label
 
-    def validate_number(self):
-        numbers = divisors(8**numpy.longlong(self.period.value()) - 1)
-        if self.number.value() not in numbers:
-            QtWidgets.QMessageBox.critical(self, 'ERROR', F'{self.number.value()} is not a divisor')
-
     def get_period_factors(self, T):
-        a = numpy.longlong(8)
-        b = numpy.longlong(T)
-        label = self.get_factors(a**b - 1)
+        self.fillDivisors(T)
+        label = self.get_factors(self.numbers[-1]['factors'])
         self.factorsLabel.setText(label)
 
     def fillDivisors(self, T):
-        a = numpy.longlong(8)
-        b = numpy.longlong(T)
-        numbers = divisors(a**b - 1)
+        a = int(8)
+        b = int(T)
+        c = int(2)
+        self.numbers = getDivisorsAndFactors(a**b - 1, a)
         self.divisors.clear()
-        for x in numbers:
-            period = getPeriod(x, 8)
-            txt = f'{x} ({period}) = {self.get_factors(x)}'
+        is_even: bool = True if T % 2 == 0 else False
+        specials = []
+        if is_even:
+            specials = divisors(a**(T//2) + 1)
+        else:
+            specials = [c**b - 1]
+        for record in self.numbers:
+            x: int = record['number']
+            factors: dict = record['factors']
+            period: int = record['period']
+            txt = f'{x} ({period}) = {self.get_factors(factors)}'
             item = QtWidgets.QListWidgetItem(txt)
+            is_prime: bool = True if x in factors.keys() and factors[x] == 1 else False
             if period != T:
-                factors = primefactors(x)
-                if len(factors) == 1:
-                    item.setForeground(QtGui.QBrush(Qt.darkRed))
-                else:
+                if is_prime:
                     item.setForeground(QtGui.QBrush(Qt.red))
+                else:
+                    item.setForeground(QtGui.QBrush(Qt.darkRed))
             else:
-                factors = primefactors(x)
-                if len(factors) == 1:
+                if is_prime:
                     item.setForeground(QtGui.QBrush(Qt.blue))
+                elif x in specials:
+                    item.setForeground(QtGui.QBrush(Qt.darkGreen))
             self.divisors.addItem(item)
                 
     def setNumber(self, index):
