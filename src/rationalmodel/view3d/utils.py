@@ -52,7 +52,7 @@ def divisors(n: int) -> list[int]:
     divisors.sort()
     return divisors
 
-def getExponents(factors: dict, exponents: list[int]) -> dict:
+def getExponentsFromFactors(factors: dict, exponents: list[int]) -> dict:
     out: dict = copy(factors)
     keys: list = list(factors.keys())
     for index in range(0, len(exponents)):
@@ -78,7 +78,7 @@ def getDivisorsAndFactors(n: int, base: int) -> list[dict]:
         record: dict = {
             'number': number,
             'period': getPeriod(number, base),
-            'factors': getExponents(factors, listfactors[listfactors.index(f)])
+            'factors': getExponentsFromFactors(factors, listfactors[listfactors.index(f)])
         }
         divisors.append(record)
     divisors.sort(key=lambda x: x['number'])

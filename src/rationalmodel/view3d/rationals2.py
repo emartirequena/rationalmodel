@@ -35,6 +35,8 @@ class Rational():
         return (digits, reminders)
 
     def getPeriod(self):
+        if self.n == 1:
+            return 1
         base = 2**self.dim
         p = 1
         reminder = 1

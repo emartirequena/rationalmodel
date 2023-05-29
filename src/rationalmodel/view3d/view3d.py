@@ -6,6 +6,7 @@ import subprocess
 import sys
 from copy import deepcopy
 from tokenize import Double
+from glm import log
 
 import moderngl as mgl
 from madcad import mathutils, vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
@@ -171,7 +172,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.timeWidget = QtWidgets.QSlider(Qt.Horizontal)
         self.timeWidget.setMinimum(0)
-        self.timeWidget.setMaximum(1000)
+        self.timeWidget.setMaximum(10000)
         self.timeWidget.setTickInterval(1)
         self.timeWidget.setTickPosition(QtWidgets.QSlider.TicksAbove)
         self.timeWidget.valueChanged.connect(self.make_objects)
@@ -200,17 +201,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gridLayout.addWidget(self.label2, 1, 0)
         self.maxTime = QtWidgets.QSpinBox(self)
         self.maxTime.valueChanged.connect(self.timeWidget.setMaximum)
+        self.maxTime.valueChanged.connect(self.timeWidget.setValue)
         self.maxTime.setMinimum(0)
         self.maxTime.setMaximum(10000)
-        self.period.valueChanged.connect(self.maxTime.setValue)
-        self.period.valueChanged.connect(self.time.setValue)
         self.gridLayout.addWidget(self.maxTime, 1, 1)
 
         self.label3 = QtWidgets.QLabel('Number')
         self.gridLayout.addWidget(self.label3, 2, 0)
-        self.number = QtWidgets.QSpinBox(self)
+        self.number = QtWidgets.QDoubleSpinBox(self)
         self.number.setMinimum(0)
-        self.number.setMaximum(2147483647)
+        self.number.setDecimals(0)
+        self.number.setMaximum(18446744073709551615)
         self.number.setEnabled(False)
         self.gridLayout.addWidget(self.number, 2, 1)
 
@@ -220,13 +221,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self.factorsLabel.setWordWrap(True)
         self.gridLayout.addWidget(self.factorsLabel, 3, 1)
 
-        self.rightLayout.addLayout(self.gridLayout)
-
         self.factorsLayout = QtWidgets.QVBoxLayout()
-        self.rightLayout.addLayout(self.factorsLayout)
+        self.gridLayout.addLayout(self.factorsLayout, 4, 0)
 
         self.label4 = QtWidgets.QLabel('Divisors')
-        self.rightLayout.addWidget(self.label4)
+        self.gridLayout.addWidget(self.label4, 5, 0)
+        self.label_num_divisors = QtWidgets.QLabel('')
+        self.gridLayout.addWidget(self.label_num_divisors, 5, 1)
+
+        self.rightLayout.addLayout(self.gridLayout)
 
         self.divisors = QtWidgets.QListWidget(self)
         self.divisors.clicked.connect(self.setNumber)
@@ -403,7 +406,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.number.value() == 0:
             return
         
-        self.setStatus('Creating ..')
+        self.setStatus('Creating incremental spacetime...')
         self.rendering = True
 
         if self.redifussion.isChecked():
@@ -411,7 +414,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
 
-        self.setStatus(f'Setting rational set for number: {self.number.value()} ...')
+        self.setStatus(f'Setting rational set for number: {int(self.number.value())} ...')
         self.spacetime.setRationalSet(int(self.number.value()))
 
         self.setStatus('Adding rational set...')
@@ -513,6 +516,9 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 labels.append(str(factor) + '^' + str(factors[factor]))
 
+        if not labels:
+            labels = ['1']
+
         label = ', '.join(labels)
         return label
 
@@ -529,9 +535,12 @@ class MainWindow(QtWidgets.QMainWindow):
         return label
 
     def get_period_factors(self, T):
+        self.setStatus('Computing divisors...')
         self.fillDivisors(T)
         label = self.get_factors(self.numbers[-1]['factors'])
         self.factorsLabel.setText(label)
+        self.label_num_divisors.setText(f'{len(self.divisors)}')
+        self.maxTime.setValue(3 * T)
 
     def fillDivisors(self, T):
         a = int(8)
@@ -558,10 +567,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 else:
                     item.setForeground(QtGui.QBrush(Qt.darkRed))
             else:
-                if is_prime:
-                    item.setForeground(QtGui.QBrush(Qt.blue))
-                elif x in specials:
+                if x in specials:
                     item.setForeground(QtGui.QBrush(Qt.darkGreen))
+                elif is_prime:
+                    item.setForeground(QtGui.QBrush(Qt.blue))
             self.divisors.addItem(item)
                 
     def setNumber(self, index):
