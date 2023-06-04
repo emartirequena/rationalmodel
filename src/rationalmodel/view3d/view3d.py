@@ -6,7 +6,6 @@ import subprocess
 import sys
 from copy import deepcopy
 from tokenize import Double
-from glm import log
 
 import moderngl as mgl
 from madcad import mathutils, vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
@@ -122,6 +121,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setUpUi()
+        self.count = 0
         self.objs = dict()
         self.list_objs = list()
         self.view = None
@@ -131,7 +131,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.spacetime = None
         self.factors = ''
         self.num = 0
-        self.numbers = []
+        self.numbers = {}
         self.rendering = False
         self.color = ColorLine()
         self.color.add(0.0,  vec3(0.2, 0.2, 1.0))
@@ -305,7 +305,7 @@ class MainWindow(QtWidgets.QMainWindow):
         app.processEvents()
 
     def makePath(self, period, number):
-        factors = self.get_output_factors(number)        
+        factors = self.get_output_factors(number)
         base_path  = os.path.join(image_path, f'P{period}')
         if not os.path.exists(base_path):
             os.makedirs(base_path)
@@ -445,16 +445,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.num = 0
         max = -1
-        count = 0
+        self.count = 0
         for i in range(len(space.cells)):
             cell = space.cells[i].get()
             num = cell['count']
             if num > max:
                 max = num
             if cell['count']:
-                count += 1
+                self.count += 1
                 self.num += cell['count']
-        self.setStatus(f'Num spheres: {count}, time: {time}')
+        self.setStatus(f'Num spheres: {self.count}, time: {time}')
 
         for i in range(len(space.cells)):
             cell = space.cells[i].get()
@@ -503,10 +503,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.center()
             self.view.adjust(scene.box())
         del self.objs
-        self.setStatus('Objects list created...')
+        self.setStatus(f'{self.count} objects created...')
         self.rendering = False
         
-    def get_factors(self, factors):
+    def get_factors(self, number):
+        factors = self.numbers[number]['factors']
         labels = []
         for factor in factors.keys():
             if factors[factor] == 0:
@@ -522,7 +523,8 @@ class MainWindow(QtWidgets.QMainWindow):
         label = ', '.join(labels)
         return label
 
-    def get_output_factors(self, factors):
+    def get_output_factors(self, number):
+        factors = self.numbers[number]['factors']
         labels = []
         for factor in factors.keys():
             if factors[factor] == 0:
@@ -537,10 +539,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def get_period_factors(self, T):
         self.setStatus('Computing divisors...')
         self.fillDivisors(T)
-        label = self.get_factors(self.numbers[-1]['factors'])
+        label = self.get_factors(list(self.numbers.keys())[-1])
         self.factorsLabel.setText(label)
         self.label_num_divisors.setText(f'{len(self.divisors)}')
-        self.maxTime.setValue(3 * T)
+        self.maxTime.setValue(T * (3 if T < 16 else 2))
 
     def fillDivisors(self, T):
         a = int(8)
@@ -554,11 +556,11 @@ class MainWindow(QtWidgets.QMainWindow):
             specials = divisors(a**(T//2) + 1)
         else:
             specials = [c**b - 1]
-        for record in self.numbers:
+        for record in self.numbers.values():
             x: int = record['number']
             factors: dict = record['factors']
             period: int = record['period']
-            txt = f'{x} ({period}) = {self.get_factors(factors)}'
+            txt = f'{x} ({period}) = {self.get_factors(x)}'
             item = QtWidgets.QListWidgetItem(txt)
             is_prime: bool = True if x in factors.keys() and factors[x] == 1 else False
             if period != T:

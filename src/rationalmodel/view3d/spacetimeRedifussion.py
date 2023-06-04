@@ -1,5 +1,4 @@
 from rationals2 import Rational, c
-from math import pow
 import random
 
 
@@ -31,7 +30,7 @@ class Space(object):
 	def __init__(self, t, dim):
 		self.t = t
 		self.dim = dim
-		self.base = int(pow(2, dim))
+		self.base = 2**dim
 		self.cells = []
 		if self.dim == 1:
 			for nx in range(t + 1):
@@ -68,7 +67,7 @@ class SpaceTime(object):
 		self.T = T
 		self.max = max
 		self.dim = dim
-		self.base = int(pow(2, dim))
+		self.base = 2**dim
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
 		self.rationalSet = []
 

@@ -1,4 +1,3 @@
-import numpy
 c = 0.5
 
 
@@ -22,17 +21,18 @@ class Rational():
             digits = [base - 1]
             return (digits, reminders)
         digits = []
-        reminders = []
+        # reminders = []
         reminder = self.m
         digit = reminder * base // self.n
         while True:
             digits.append(digit)
-            reminders.append(reminder)
+            # reminders.append(reminder)
             reminder = (reminder * base) % self.n
             digit = reminder * base // self.n
             if reminder == self.m:
                 break
-        return (digits, reminders)
+        # return (digits, reminders)
+        return (digits, [])
 
     def getPeriod(self):
         if self.n == 1:
@@ -48,7 +48,7 @@ class Rational():
         return p
 
     def getPosition(self, t):
-        (digits, _) = self.sequences
+        digits = self.sequences[0]
         period = len(digits)
         x = 0.0
         y = 0.0
@@ -98,3 +98,8 @@ class Rational():
         digits = self.sequences[0]
         T = len(digits)
         return digits[t % T]
+
+
+if __name__ == '__main__':
+    r = Rational(6, 13, 3)
+    print(r.position(4))
