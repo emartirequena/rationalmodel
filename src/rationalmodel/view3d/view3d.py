@@ -85,36 +85,28 @@ class ColorLine:
 
 
 class MainView(rendering.View):
-    def __init__(self, mainWindow, scene, parent=None):
+    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene, parent=None):
         self.mainWindow = mainWindow
         super().__init__(scene, parent=parent)
 
-    def inputEvent(self, event):
-        if event.type() == 3:
-            obj = self.itemat(QtCore.QPoint(event.x(), event.y()))
-            if obj:
-                center = self.scene.item(obj).box.center
-                t = self.mainWindow.timeWidget.value()
-                spacetime = self.mainWindow.spacetime
-                cell = spacetime.getCell(t, center.x, center.y, center.z)
-                max = self.mainWindow.num or 1
-                percent = 100.0 * float(cell.count)/float(max)
-                text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
-                self.mainWindow.setStatus(text)
-        else:
-            super().inputEvent(event)
+    @staticmethod
+    def mouseClick(self, event):
+        obj = self.itemat(QtCore.QPoint(event.x(), event.y()))
+        if obj:
+            center = self.scene.item(obj).box.center
+            t = self.mainWindow.timeWidget.value()
+            spacetime = self.mainWindow.spacetime
+            cell = spacetime.getCell(t, center.x, center.y, center.z)
+            max = self.mainWindow.num or 1
+            percent = 100.0 * float(cell.count)/float(max)
+            text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
+            self.mainWindow.setStatus(text)
 
-class Number(QtWidgets.QSpinBox):
-    def __init__(self, parent=None):
-        QtWidgets.QSpinBox.__init__(self, parent=parent)
-        
-    def validate(self, input, pos):
-        num = int(input) if input else 0
-        if self.parent().parent().validate_number(num, self.parent().parent().period.value()):
-            print('is valid')
-            return (QtGui.QValidator.State.Acceptable, input, num)
-        print('is invalid')
-        return (QtGui.QValidator.State.Invalid, input, num)
+    def event(self, event):
+        if event.type() == 3:
+            self.mouseClick(self, event)
+            return True
+        return super().event(event)
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -125,6 +117,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objs = dict()
         self.list_objs = list()
         self.view = None
+        self.rendering = False
         self.getConfig()
         self.make_view()
         self.showMaximized()
@@ -132,7 +125,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.factors = ''
         self.num = 0
         self.numbers = {}
-        self.rendering = False
         self.color = ColorLine()
         self.color.add(0.0,  vec3(0.2, 0.2, 1.0))
         self.color.add(0.05, vec3(0.7, 0.3, 0.4))
@@ -175,7 +167,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setMaximum(10000)
         self.timeWidget.setTickInterval(1)
         self.timeWidget.setTickPosition(QtWidgets.QSlider.TicksAbove)
-        self.timeWidget.valueChanged.connect(self.make_objects)
         self.timeLayout.addWidget(self.timeWidget)
 
         self.time = QtWidgets.QSpinBox(self)
@@ -284,24 +275,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatusBar(self.statusBar)
 
     def decrementTime(self):
-        if self.rendering:
-            return
+        print('------- decrement time...')
         t = self.timeWidget.value()
         if t > 0:
             self.timeWidget.setValue(t - 1)
+            self.make_objects(time=t - 1)
 
     def incrementTime(self):
-        if self.rendering:
-            return
+        print('------- increment time...')
         t = self.timeWidget.value()
         if t < self.maxTime.value():
             self.timeWidget.setValue(t + 1)
+            self.make_objects(time=t + 1)
 
     def setStatus(self, txt: str):
         print(txt)
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
-        global app
+        self.update()
         app.processEvents()
 
     def makePath(self, period, number):
@@ -317,6 +308,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def saveImage(self):
         self.setStatus('Saving image...')
         self.rendering = True
+        
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
         time = self.timeWidget.value()
@@ -489,22 +481,48 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.objs
 
     def make_view(self):
-        if self.view and len(self.view.scene.displays):
-            self.view.scene.displays.clear()
-            self.view.scene.update(self.objs)
-            self.view.scene.render(self.view)
-            self.view.update()
-        else:
+
+        if not self.view:
+            print("view doesn't exists...")
             scene = rendering.Scene(self.objs, options=None)
-            self.viewLayout.takeAt(0)
-            self.view = MainView(self, scene, parent=self.central)
+            self.view = MainView(self, scene)
             self.viewLayout.addWidget(self.view)
             self.view.show()
             self.view.center()
-            self.view.adjust(scene.box())
+            self.view.adjust(self.view.scene.box())
+            
+        elif not len(self.view.scene.displays) and self.view.navigation.distance == 1.0:
+            print('first number setted...')
+            self.view.scene.add(self.objs)
+            self.view.scene.render(self.view)
+            self.view.show()
+            self.view.center()
+            self.view.adjust(self.view.scene.box())
+
+        elif not len(self.view.scene.displays):
+            print('came from save image...')
+            self.view.removeEventFilter(self)
+            projection = deepcopy(self.view.projection)
+            navigation = deepcopy(self.view.navigation)
+            scene = rendering.Scene(self.objs, options=None)
+            self.viewLayout.takeAt(0)
+            self.view = MainView(self, scene)
+            self.view.projection = projection
+            self.view.navigation = navigation
+            self.viewLayout.addWidget(self.view)
+            self.view.update()
+
+        else:
+            print('continue setting number...')
+            self.view.scene.displays.clear()
+            self.view.scene.add(self.objs)
+            self.view.scene.render(self.view)
+            self.view.update()
+
         del self.objs
-        self.setStatus(f'{self.count} objects created...')
+        self.objs = {}
         self.rendering = False
+        self.setStatus(f'{self.count} objects created at frame {self.timeWidget.value()}...')
         
     def get_factors(self, number):
         factors = self.numbers[number]['factors']
@@ -542,7 +560,7 @@ class MainWindow(QtWidgets.QMainWindow):
         label = self.get_factors(list(self.numbers.keys())[-1])
         self.factorsLabel.setText(label)
         self.label_num_divisors.setText(f'{len(self.divisors)}')
-        self.maxTime.setValue(T * (3 if T < 16 else 2))
+        self.maxTime.setValue(T * (4 if T < 8 else (3 if T < 17 else 2)))
 
     def fillDivisors(self, T):
         a = int(8)
@@ -581,6 +599,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
+    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QtWidgets.QApplication(sys.argv)
     wi = MainWindow()
     wi.show()

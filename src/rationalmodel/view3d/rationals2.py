@@ -21,7 +21,7 @@ class Rational():
             digits = [base - 1]
             return (digits, reminders)
         digits = []
-        # reminders = []
+        reminders = []
         reminder = self.m
         digit = reminder * base // self.n
         while True:
@@ -31,8 +31,7 @@ class Rational():
             digit = reminder * base // self.n
             if reminder == self.m:
                 break
-        # return (digits, reminders)
-        return (digits, [])
+        return (digits, reminders)
 
     def getPeriod(self):
         if self.n == 1:
@@ -99,7 +98,9 @@ class Rational():
         T = len(digits)
         return digits[t % T]
 
+    def __str__(self) -> str:
+        return f'({self.m} / {self.n})'
 
 if __name__ == '__main__':
-    r = Rational(6, 13, 3)
-    print(r.position(4))
+    r = Rational(6, 13, 1)
+    print(r, r.position(4))

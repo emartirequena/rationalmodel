@@ -68,7 +68,7 @@ def getExponentsFromFactors(factors: dict, exponents: list[int]) -> dict:
             out[keys[index]] = factor + 1
     return out
 
-def getDivisorsAndFactors(n: int, base: int):
+def getDivisorsAndFactors(n: int, base: int) -> dict:
     factors = factorGenerator(n)
     divisors: dict = {}
     listexponents: list[list[int]] = [list(map(lambda x:int(k**x),range(0, factors[k]+1))) for k in factors.keys()]
@@ -85,7 +85,6 @@ def getDivisorsAndFactors(n: int, base: int):
     return divisors
 
 def getPeriod(n: int, base: int) -> int:
-    # print(f'getPeriod({n}, {base})')
     if n == 1:
         return 1
     reminder = 1
@@ -99,4 +98,4 @@ def getPeriod(n: int, base: int) -> int:
 
 
 if __name__ == '__main__':
-    getDivisorsAndFactors(8**4-1, 8)
+    print(getDivisorsAndFactors(4**4-1, 4))
