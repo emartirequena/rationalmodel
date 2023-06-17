@@ -297,10 +297,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def makePath(self, period, number):
         factors = self.get_output_factors(number)
-        base_path  = os.path.join(image_path, f'P{period}')
+        base_path  = os.path.join(image_path, f'P{period:02d}')
         if not os.path.exists(base_path):
             os.makedirs(base_path)
-        path = os.path.join(base_path, f'N{number}_F{factors}')
+        path = os.path.join(base_path, f'N{number:d}_F{factors}')
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -311,21 +311,23 @@ class MainWindow(QtWidgets.QMainWindow):
         
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
-        time = self.timeWidget.value()
-        objs = deepcopy(self.make_objects(time=time, make_view=False))
-        scene = rendering.Scene(objs)
-        scene.ctx = create_standalone_context()
-        scene.ctx.multisample = False
-        scene.ctx.enable_only(mgl.DEPTH_TEST)
-        scene.ctx.blend_func = mgl.ONE, mgl.ZERO
-        scene.ctx.blend_equation = mgl.FUNC_ADD
-        screen = rendering.Offscreen(scene, size=(video_resx, video_resy), projection=projection, navigation=navigation)
-        img = screen.render()
-        number = self.number.value()
+        number = int(self.number.value())
         period = self.period.value()
         factors = self.get_output_factors(number)
         path = self.makePath(period, number)
-        img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+        time = self.timeWidget.value()
+        objs = deepcopy(self.make_objects(time=time, make_view=False))
+        scene = rendering.Scene()
+        scene.ctx = create_standalone_context(share=True)
+        scene.ctx.multisample = True
+        scene.ctx.enable_only(mgl.DEPTH_TEST)
+        scene.ctx.blend_func = mgl.ONE, mgl.ZERO
+        scene.ctx.blend_equation = mgl.FUNC_ADD
+        scene.displays.clear()
+        scene.add(objs)
+        screen = rendering.Offscreen(scene, size=(video_resx, video_resy), projection=projection, navigation=navigation)
+        img = screen.render()
+        img.save(os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{time:04d}.png'), save_all=True)
         del objs
         del projection
         del navigation
@@ -342,14 +344,14 @@ class MainWindow(QtWidgets.QMainWindow):
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
         
-        number = self.number.value()
+        number = int(self.number.value())
         period = self.period.value()
         factors = self.get_output_factors(number)
         
         path = self.makePath(period, number)
         
         scene = rendering.Scene()
-        scene.ctx = create_standalone_context()
+        scene.ctx = create_standalone_context(share=True)
         scene.ctx.multisample = True
         scene.ctx.enable_only(mgl.DEPTH_TEST)
         scene.ctx.blend_func = mgl.ONE, mgl.ZERO
@@ -369,7 +371,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         in_sequence = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
         out_factors = self.get_output_factors(number)
-        video_file_name = f'P{period:02d}_N{number}_F{out_factors}.{video_format}'
+        video_file_name = f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}'
         out_video = os.path.join(path, video_file_name)
         options = [
             ffmpeg_path,
