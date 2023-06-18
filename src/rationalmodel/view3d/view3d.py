@@ -167,6 +167,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setMaximum(10000)
         self.timeWidget.setTickInterval(1)
         self.timeWidget.setTickPosition(QtWidgets.QSlider.TicksAbove)
+        # self.timeWidget.valueChanged.connect(self.make_objects)
         self.timeLayout.addWidget(self.timeWidget)
 
         self.time = QtWidgets.QSpinBox(self)
@@ -257,16 +258,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menu.addMenu(self.menuUtils)
 
         self.menuTime = QtWidgets.QMenu('Time')
+
         self.actionLeft = QtWidgets.QAction('Increment time', self.centralWidget())
         self.actionLeft.setShortcut('Left')
-        self.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        # self.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionLeft.triggered.connect(self.decrementTime)
         self.menuTime.addAction(self.actionLeft)
+
         self.actionRight = QtWidgets.QAction('Decrement time', self.centralWidget())
         self.actionRight.setShortcut('Right')
-        self.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        # self.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionRight.triggered.connect(self.incrementTime)
         self.menuTime.addAction(self.actionRight)
+
         self.menu.addMenu(self.menuTime)
 
         self.statusBar = QtWidgets.QStatusBar(self)
@@ -279,21 +283,21 @@ class MainWindow(QtWidgets.QMainWindow):
         t = self.timeWidget.value()
         if t > 0:
             self.timeWidget.setValue(t - 1)
-            self.make_objects(time=t - 1)
+            self.make_objects(time=t - 1, make_view=True)
 
     def incrementTime(self):
         print('------- increment time...')
         t = self.timeWidget.value()
         if t < self.maxTime.value():
             self.timeWidget.setValue(t + 1)
-            self.make_objects(time=t + 1)
+            self.make_objects(time=t + 1, make_view=True)
 
     def setStatus(self, txt: str):
         print(txt)
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
         self.update()
-        app.processEvents()
+        app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def makePath(self, period, number):
         factors = self.get_output_factors(number)
@@ -334,6 +338,7 @@ class MainWindow(QtWidgets.QMainWindow):
         del scene
         del screen
 
+        self.view.scene.displays.clear()
         self.rendering = False
         self.setStatus('Image saved...')
 
@@ -392,6 +397,7 @@ class MainWindow(QtWidgets.QMainWindow):
         dest_video = os.path.join(video_path, video_file_name)
         shutil.copyfile(out_video, dest_video)
         
+        self.view.scene.displays.clear()
         self.rendering = False
         self.setStatus('Sequence saved...')
 
@@ -512,13 +518,15 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.projection = projection
             self.view.navigation = navigation
             self.viewLayout.addWidget(self.view)
+            self.view.show()
             self.view.update()
 
         else:
             print('continue setting number...')
             self.view.scene.displays.clear()
-            self.view.scene.add(self.objs)
+            self.view.scene.update(self.objs)
             self.view.scene.render(self.view)
+            self.view.show()
             self.view.update()
 
         del self.objs
