@@ -1,3 +1,4 @@
+from decimal import Context
 import os
 import json
 import math
@@ -6,9 +7,10 @@ import subprocess
 import sys
 from copy import deepcopy
 from tokenize import Double
+import numpy as np
 
 import moderngl as mgl
-from madcad import mathutils, vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
+from madcad import mathutils, vec3, uvec2, fmat4, rendering, settings, uvsphere, Axis, X, Y, Z, Box, render
 from moderngl import create_standalone_context
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
@@ -74,7 +76,7 @@ class ColorLine:
             return self.knots[0].value
         for index in range(len(self.knots)):
             if alpha <= self.knots[index].alpha:
-                beta = mathutils.lerp(self.knots[index - 1].alpha, self.knots[index].alpha, alpha)
+                beta = (alpha - self.knots[index - 1].alpha) / (self.knots[index].alpha - self.knots[index - 1].alpha)
                 color = colorBlend(
                     self.knots[index - 1].value,
                     self.knots[index].value,
@@ -89,9 +91,8 @@ class MainView(rendering.View):
         self.mainWindow = mainWindow
         super().__init__(scene, parent=parent)
 
-    @staticmethod
-    def mouseClick(self, event):
-        obj = self.itemat(QtCore.QPoint(event.x(), event.y()))
+    def mouseClick(self, evt):
+        obj = self.itemat(QtCore.QPoint(evt.x(), evt.y()))
         if obj:
             center = self.scene.item(obj).box.center
             t = self.mainWindow.timeWidget.value()
@@ -101,12 +102,56 @@ class MainView(rendering.View):
             percent = 100.0 * float(cell.count)/float(max)
             text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
             self.mainWindow.setStatus(text)
-
-    def event(self, event):
-        if event.type() == 3:
-            self.mouseClick(self, event)
             return True
-        return super().event(event)
+        return False
+
+    def control(self, key, evt):
+        if evt.type() == 3:
+            return self.mouseClick(evt)
+        if self.mainWindow.rendering:
+            return False
+        return super().control(key, evt)
+
+
+class RenderView(rendering.Offscreen):
+    def __init__(self, scene, size=uvec2(1920, 1080), navigation=None, projection=None):
+        self.scene = scene
+        self.projection = projection
+        self.navigation = navigation
+
+        self.uniforms = {'proj':fmat4(1), 'view':fmat4(1), 'projview':fmat4(1)}	# last frame rendering constants
+        self.targets = []
+        self.steps = []
+        self.step = 0
+        self.stepi = 0
+
+        # dump targets
+        self.map_depth = None
+        self.map_idents = None
+        self.fresh = set()	# set of refreshed internal variables since the last render
+
+        self.scene.ctx = mgl.create_standalone_context(share=True)
+
+        self.init(size)
+        self.preload()
+
+    def init(self, size):
+        w, h = size
+
+        ctx = self.scene.ctx
+        assert ctx, 'context is not initialized'
+
+        # self.fb_frame is already created and sized by Qt
+        self.fb_screen = ctx.simple_framebuffer(size)
+        self.fb_ident = ctx.simple_framebuffer(size, components=3, dtype='f1')
+        self.targets = [ ('screen', self.fb_screen, self.setup_screen),
+                            ('ident', self.fb_ident, self.setup_ident)]
+        self.map_ident = np.empty((h,w), dtype='u2')
+        self.map_depth = np.empty((h,w), dtype='f4')
+
+    def resize(self, size):
+        if size != self.fb_screen.size:
+            self.init(size)
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -126,11 +171,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.num = 0
         self.numbers = {}
         self.color = ColorLine()
-        self.color.add(0.0,  vec3(0.2, 0.2, 1.0))
-        self.color.add(0.05, vec3(0.7, 0.3, 0.4))
-        self.color.add(0.4,  vec3(0.5, 0.7, 0.5))
-        self.color.add(0.7,  vec3(0.7, 0.5, 0.3))
-        self.color.add(1.0,  vec3(1.0, 0.5, 0.2))
+        self.color.add(0.0, vec3(0.2, 0.2, 1.0))
+        self.color.add(0.5, vec3(0.3, 0.6, 0.5))
+        self.color.add(1.0, vec3(1.0, 0.5, 0.2))
         
     def getConfig(self):
         global image_path, video_path, ffmpeg_path, video_resx, video_resy, video_codec, video_format
@@ -164,10 +207,10 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.timeWidget = QtWidgets.QSlider(Qt.Horizontal)
         self.timeWidget.setMinimum(0)
-        self.timeWidget.setMaximum(10000)
+        self.timeWidget.setMaximum(100)
         self.timeWidget.setTickInterval(1)
         self.timeWidget.setTickPosition(QtWidgets.QSlider.TicksAbove)
-        # self.timeWidget.valueChanged.connect(self.make_objects)
+        self.timeWidget.valueChanged.connect(self.make_objects)
         self.timeLayout.addWidget(self.timeWidget)
 
         self.time = QtWidgets.QSpinBox(self)
@@ -261,13 +304,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.actionLeft = QtWidgets.QAction('Increment time', self.centralWidget())
         self.actionLeft.setShortcut('Left')
-        # self.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        self.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionLeft.triggered.connect(self.decrementTime)
         self.menuTime.addAction(self.actionLeft)
 
         self.actionRight = QtWidgets.QAction('Decrement time', self.centralWidget())
         self.actionRight.setShortcut('Right')
-        # self.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        self.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionRight.triggered.connect(self.incrementTime)
         self.menuTime.addAction(self.actionRight)
 
@@ -283,20 +326,17 @@ class MainWindow(QtWidgets.QMainWindow):
         t = self.timeWidget.value()
         if t > 0:
             self.timeWidget.setValue(t - 1)
-            self.make_objects(time=t - 1, make_view=True)
 
     def incrementTime(self):
         print('------- increment time...')
         t = self.timeWidget.value()
         if t < self.maxTime.value():
             self.timeWidget.setValue(t + 1)
-            self.make_objects(time=t + 1, make_view=True)
 
     def setStatus(self, txt: str):
         print(txt)
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
-        self.update()
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def makePath(self, period, number):
@@ -309,40 +349,7 @@ class MainWindow(QtWidgets.QMainWindow):
             os.makedirs(path)
         return path
 
-    def saveImage(self):
-        self.setStatus('Saving image...')
-        self.rendering = True
-        
-        projection = deepcopy(self.view.projection)
-        navigation = deepcopy(self.view.navigation)
-        number = int(self.number.value())
-        period = self.period.value()
-        factors = self.get_output_factors(number)
-        path = self.makePath(period, number)
-        time = self.timeWidget.value()
-        objs = deepcopy(self.make_objects(time=time, make_view=False))
-        scene = rendering.Scene()
-        scene.ctx = create_standalone_context(share=True)
-        scene.ctx.multisample = True
-        scene.ctx.enable_only(mgl.DEPTH_TEST)
-        scene.ctx.blend_func = mgl.ONE, mgl.ZERO
-        scene.ctx.blend_equation = mgl.FUNC_ADD
-        scene.displays.clear()
-        scene.add(objs)
-        screen = rendering.Offscreen(scene, size=(video_resx, video_resy), projection=projection, navigation=navigation)
-        img = screen.render()
-        img.save(os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{time:04d}.png'), save_all=True)
-        del objs
-        del projection
-        del navigation
-        del scene
-        del screen
-
-        self.view.scene.displays.clear()
-        self.rendering = False
-        self.setStatus('Image saved...')
-
-    def saveVideo(self):
+    def _saveImages(self, init_time, end_time):
         self.setStatus('Saving sequence...')
         self.rendering = True
         
@@ -354,15 +361,11 @@ class MainWindow(QtWidgets.QMainWindow):
         factors = self.get_output_factors(number)
         
         path = self.makePath(period, number)
-        
+
         scene = rendering.Scene()
-        scene.ctx = create_standalone_context(share=True)
-        scene.ctx.multisample = True
-        scene.ctx.enable_only(mgl.DEPTH_TEST)
-        scene.ctx.blend_func = mgl.ONE, mgl.ZERO
-        scene.ctx.blend_equation = mgl.FUNC_ADD
-        screen = rendering.Offscreen(scene, size=(video_resx, video_resy), projection=projection, navigation=navigation)
-        for time in range(self.maxTime.value() + 1):
+        screen = RenderView(scene, projection=projection, navigation=navigation)
+        screen.resize((1920, 1080))
+        for time in range(init_time, end_time + 1):
             objs = deepcopy(self.make_objects(time=time, make_view=False))
             scene.displays.clear()
             scene.add(objs)
@@ -373,33 +376,41 @@ class MainWindow(QtWidgets.QMainWindow):
         del navigation
         del scene
         del screen
-        
-        in_sequence = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
-        out_factors = self.get_output_factors(number)
-        video_file_name = f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}'
-        out_video = os.path.join(path, video_file_name)
-        options = [
-            ffmpeg_path,
-            '-y',
-            '-r', '1',
-            '-i', in_sequence,
-            '-c', video_codec,
-            '-f', video_format,
-            '-s', f'{video_resx}x{video_resy}',
-            out_video,
-        ]
-        self.setStatus('Making video...')
-        subprocess.run(options)
 
-        self.setStatus('Copying video...')
-        if not os.path.exists(video_path):
-            os.makedirs(video_path)
-        dest_video = os.path.join(video_path, video_file_name)
-        shutil.copyfile(out_video, dest_video)
+        # if there are more tha one image, save video
+        if init_time != end_time:
+            in_sequence = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
+            out_factors = self.get_output_factors(number)
+            video_file_name = f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}'
+            out_video = os.path.join(path, video_file_name)
+            options = [
+                ffmpeg_path,
+                '-y',
+                '-r', '1',
+                '-i', in_sequence,
+                '-c', video_codec,
+                '-f', video_format,
+                '-s', f'{video_resx}x{video_resy}',
+                out_video,
+            ]
+            self.setStatus('Making video...')
+            subprocess.run(options)
+
+            self.setStatus('Copying video...')
+            if not os.path.exists(video_path):
+                os.makedirs(video_path)
+            dest_video = os.path.join(video_path, video_file_name)
+            shutil.copyfile(out_video, dest_video)
         
-        self.view.scene.displays.clear()
+        # self.view.scene.displays.clear()
         self.rendering = False
         self.setStatus('Sequence saved...')
+
+    def saveImage(self):
+        self._saveImages(self.time.value(), self.time.value())
+
+    def saveVideo(self):
+        self._saveImages(0, self.maxTime.value())
 
     def compute(self):
 
@@ -462,13 +473,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if num == 0:
                 continue
             x, y, z = cell['pos']
-            alpha = float(num)/float(max)
-            rad = alpha * 0.5
-            if rad < 0.07:
-                rad = 0.07
+            alpha = float(num) / float(max)
+            rad = math.pow(alpha / 2.3, 0.8)
+            if rad < 0.02:
+                rad = 0.02
             sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(20 * math.pow(rad, 0.2))))
             sphere.option(color=self.color.getColor(alpha))
-
             self.list_objs.append(sphere)
 
         axisX = Axis(vec3(0), X)
