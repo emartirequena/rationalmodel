@@ -6,7 +6,6 @@ import shutil
 import subprocess
 import sys
 from copy import deepcopy
-from tokenize import Double
 import numpy as np
 
 import moderngl as mgl
@@ -19,13 +18,6 @@ from utils import getDivisorsAndFactors, divisors
 
 from spacetime import SpaceTime
 
-image_path = ''
-video_path = ''
-ffmpeg_path = ''
-video_resx = 1920
-video_resy = 1080
-video_codec = 'prores'
-video_format = 'mov'
 settings_file = r'settings.txt'
 config_file = r'config.json'
 validations = 0
@@ -33,23 +25,8 @@ validations = 0
 opengl_version = (3,3)
 
 
-def colorBlend(a, b, alpha):
-    r = mathutils.lerp(a.x, b.x, alpha)
-    g = mathutils.lerp(a.y, b.y, alpha)
-    b = mathutils.lerp(a.z, b.z, alpha)
-    return vec3(r, g, b)
-
-
-def get_next_frame() -> int:
-    elem = list(filter(lambda x: 'image' in x, sorted(os.listdir(image_path))))
-    if elem:
-        return int(elem[-1].split('.')[-2]) + 1
-    else:
-        return 1
-
-
 class ColorKnot:
-    def __init__(self, alpha: Double, value: vec3) -> None:
+    def __init__(self, alpha: float, value: vec3) -> None:
         self.alpha = alpha
         self.value = value
 
@@ -59,10 +36,17 @@ class ColorLine:
         self.knots: list[ColorKnot] = []
         self.normalized = False
     
-    def add(self, alpha: Double, value: vec3):
+    def add(self, alpha: float, value: vec3):
         self.knots.append(ColorKnot(alpha, value))
         self.knots.sort(key=lambda x: x.alpha)
         self.normalized = False
+
+    @staticmethod
+    def _blend(a: vec3, b: vec3, alpha: float) -> vec3:
+        r = mathutils.lerp(a.x, b.x, alpha)
+        g = mathutils.lerp(a.y, b.y, alpha)
+        b = mathutils.lerp(a.z, b.z, alpha)
+        return vec3(r, g, b)
 
     def normalize(self):
         if not self.normalized:
@@ -70,14 +54,18 @@ class ColorLine:
             for knot in self.knots:
                 knot.alpha = knot.alpha / self.knots[-1].alpha
 
-    def getColor(self, alpha) -> vec3:
+    def getColor(self, alpha: float) -> vec3:
         self.normalize()
-        if alpha == 0.0:
+        if alpha <= 0.0:
             return self.knots[0].value
+        if alpha >= 1.0:
+            return self.knots[-1].value
         for index in range(len(self.knots)):
             if alpha <= self.knots[index].alpha:
-                beta = (alpha - self.knots[index - 1].alpha) / (self.knots[index].alpha - self.knots[index - 1].alpha)
-                color = colorBlend(
+                alpha1 = self.knots[index - 1].alpha
+                alpha2 = self.knots[index].alpha
+                beta = (alpha - alpha1) / (alpha2 - alpha1)
+                color = self._blend(
                     self.knots[index - 1].value,
                     self.knots[index].value,
                     beta
@@ -85,6 +73,39 @@ class ColorLine:
                 return color
         return vec3(1)
 
+
+class Config:
+    def __init__(self):
+        self.values = {
+            'image_path': '',
+            'video_path': '',
+            'image_resx': 1920,
+            'image_resy': 1080,
+            'ffmpeg_path': '',
+            'video_codec': 'prores',
+            'video_format': 'mov',
+            'colors': [
+                {'alpha': 0.0, 'color': [0.2, 0.2, 1.0]},
+                {'alpha': 0.5, 'color': [0.3, 0.6, 0.5]},
+                {'alpha': 1.0, 'color': [1.0, 0.5, 0.2]}
+            ],
+            'rad_factor': 2.3,
+            'rad_pow': 0.8,
+            'max_faces': 20,
+            'faces_pow': 0.2
+        }
+        if os.path.exists(config_file):
+            with open(config_file, 'rt') as fp:
+                values = json.load(fp)
+                for key in list(values.keys()):
+                    if key in self.values:
+                        self.values[key] = values[key]
+
+    def get(self, key: str):
+        if key in self.values:
+            return self.values[key]
+        return ''
+            
 
 class MainView(rendering.View):
     def __init__(self, mainWindow: QtWidgets.QMainWindow, scene, parent=None):
@@ -99,7 +120,7 @@ class MainView(rendering.View):
             spacetime = self.mainWindow.spacetime
             cell = spacetime.getCell(t, center.x, center.y, center.z)
             max = self.mainWindow.num or 1
-            percent = 100.0 * float(cell.count)/float(max)
+            percent = 100.0 * float(cell.count) / float(max)
             text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
             self.mainWindow.setStatus(text)
             return True
@@ -163,31 +184,20 @@ class MainWindow(QtWidgets.QMainWindow):
         self.list_objs = list()
         self.view = None
         self.rendering = False
-        self.getConfig()
+        settings.load(settings_file)
         self.make_view()
         self.showMaximized()
         self.spacetime = None
         self.factors = ''
         self.num = 0
         self.numbers = {}
+        self.config = Config()
         self.color = ColorLine()
-        self.color.add(0.0, vec3(0.2, 0.2, 1.0))
-        self.color.add(0.5, vec3(0.3, 0.6, 0.5))
-        self.color.add(1.0, vec3(1.0, 0.5, 0.2))
+        colors = self.config.get('colors')
+        if colors:
+            for color in colors:
+                self.color.add(color['alpha'], vec3(*color['color']))
         
-    def getConfig(self):
-        global image_path, video_path, ffmpeg_path, video_resx, video_resy, video_codec, video_format
-        settings.load(settings_file)
-        with open(config_file, 'rt') as fp:
-            config = json.load(fp)
-            image_path = config.get('image_path')
-            video_path = config.get('video_path')
-            ffmpeg_path = config.get('ffmpeg_path')
-            video_resx = config.get('video_resx', 1920)
-            video_resy = config.get('video_resy', 1080)
-            video_codec = config.get('video_codec', 'prores')
-            video_format = config.get('video_format', 'mov')
-
     def setUpUi(self):
         self.resize(1000, 700)
 
@@ -341,7 +351,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def makePath(self, period, number):
         factors = self.get_output_factors(number)
-        base_path  = os.path.join(image_path, f'P{period:02d}')
+        base_path  = os.path.join(self.config.get('image_path'), f'P{period:02d}')
         if not os.path.exists(base_path):
             os.makedirs(base_path)
         path = os.path.join(base_path, f'N{number:d}_F{factors}')
@@ -361,10 +371,17 @@ class MainWindow(QtWidgets.QMainWindow):
         factors = self.get_output_factors(number)
         
         path = self.makePath(period, number)
+        image_resx = self.config.get('image_resx')
+        image_resy = self.config.get('image_resy')
+        ffmpeg_path = self.config.get('ffmpeg_path')
+        video_path = self.config.get('video_path')
+        video_format = self.config.get('video_format')
+        video_codec = self.config.get('video_codec')
 
         scene = rendering.Scene()
         screen = RenderView(scene, projection=projection, navigation=navigation)
-        screen.resize((1920, 1080))
+        screen.resize((image_resx, image_resy))
+
         for time in range(init_time, end_time + 1):
             objs = deepcopy(self.make_objects(time=time, make_view=False))
             scene.displays.clear()
@@ -390,7 +407,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 '-i', in_sequence,
                 '-c', video_codec,
                 '-f', video_format,
-                '-s', f'{video_resx}x{video_resy}',
+                '-s', f'{image_resx}x{image_resy}',
                 out_video,
             ]
             self.setStatus('Making video...')
@@ -467,6 +484,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.num += cell['count']
         self.setStatus(f'Num spheres: {self.count}, time: {time}')
 
+        rad_factor = self.config.get('rad_factor')
+        rad_pow = self.config.get('rad_pow')
+        max_faces = self.config.get('max_faces')
+        faces_pow = self.config.get('faces_pow')
+
         for i in range(len(space.cells)):
             cell = space.cells[i].get()
             num = cell['count']
@@ -474,10 +496,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 continue
             x, y, z = cell['pos']
             alpha = float(num) / float(max)
-            rad = math.pow(alpha / 2.3, 0.8)
+            rad = math.pow(alpha / rad_factor, rad_pow)
             if rad < 0.02:
                 rad = 0.02
-            sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(20 * math.pow(rad, 0.2))))
+            sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             sphere.option(color=self.color.getColor(alpha))
             self.list_objs.append(sphere)
 
