@@ -457,20 +457,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.center()
             self.view.adjust(self.view.scene.box())
 
-        # elif not len(self.view.scene.displays):
-        #     print('came from save image...')
-        #     self.view.removeEventFilter(self)
-        #     projection = deepcopy(self.view.projection)
-        #     navigation = deepcopy(self.view.navigation)
-        #     scene = rendering.Scene(self.objs, options=None)
-        #     self.viewLayout.takeAt(0)
-        #     self.view = MainView(self, scene)
-        #     self.view.projection = projection
-        #     self.view.navigation = navigation
-        #     self.viewLayout.addWidget(self.view)
-        #     self.view.show()
-        #     self.view.update()
-
         else:
             print('continue setting numbers...')
             self.view.scene.displays.clear()
