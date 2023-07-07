@@ -1,29 +1,36 @@
+import numpy as np
+
 c = 0.5
 
 
 class Rational():
     def __init__(self, m: int, n: int, dim=1):
-        self.m = m
-        self.n = n
-        self.dim = dim
-        self.sequences = self.getSequence()
-        self.period =self.getPeriod()
+        self.m: np.uint16 = m
+        self.n: np.uint16 = n
+        self.dim: np.uint8 = dim
+        self.period: np.uint8 =self.getPeriod()
+
+        self.digits: list[np.uint8] = []
+        self.reminders: list[np.uint16] = []
+        self.digits, self.reminders = self.getSequence()
         self.positions = [self.getPosition(t) for t in range(self.period + 1)]
+        del self.digits
+        del self.reminders
 
     def getSequence(self):
         base = int(2**self.dim)
         if self.m == 0:
-            reminders = [0]
-            digits = [0]
+            reminders: list[np.utin16] = [0]
+            digits: list[np.uint8] = [0]
             return (digits, reminders)
         elif self.m == self.n:
-            reminders = [self.m]
-            digits = [base - 1]
+            reminders: list[np.utin16] = [self.m]
+            digits: list[np.utin8] = [base - 1]
             return (digits, reminders)
-        digits = []
-        reminders = []
-        reminder = self.m
-        digit = reminder * base // self.n
+        digits: list[np.utin8] = []
+        reminders: list[np.utin16] = []
+        reminder: np.uint16 = self.m
+        digit: np.uint8 = reminder * base // self.n
         while True:
             digits.append(digit)
             # reminders.append(reminder)
@@ -47,13 +54,12 @@ class Rational():
         return p
 
     def getPosition(self, t):
-        digits = self.sequences[0]
-        period = len(digits)
-        x = 0.0
-        y = 0.0
-        z = 0.0
+        period = len(self.digits)
+        x: np.float16 = 0.0
+        y: np.float16 = 0.0
+        z: np.float16 = 0.0
         for i in range(t):
-            digit = digits[i % period]
+            digit = self.digits[i % period]
             dx = (digit % 2)
             dy = (digit // 2) % 2
             dz = (digit // 4) % 2
@@ -66,16 +72,15 @@ class Rational():
         return self.period
 
     def path(self):
-        digits = self.sequences[0]
-        return ''.join([str(d) for d in digits])
+        return ''.join([str(d) for d in self.digits])
 
     def reminders(self):
-        return self.sequences[1]
+        return self.reminders
 
     def position(self, t):
-        px = 0.0
-        py = 0.0
-        pz = 0.0
+        px: np.float16 = 0.0
+        py: np.float16 = 0.0
+        pz: np.float16 = 0.0
         nt = t // self.period
         for _ in range(nt):
             x, y, z = self.positions[self.period]
@@ -94,9 +99,8 @@ class Rational():
         return px, py, pz
 
     def digit(self, t):
-        digits = self.sequences[0]
-        T = len(digits)
-        return digits[t % T]
+        T = len(self.digits)
+        return self.digits[t % T]
 
     def __str__(self) -> str:
         return f'({self.m} / {self.n})'

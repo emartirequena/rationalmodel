@@ -15,97 +15,15 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
 from utils import getDivisorsAndFactors, divisors
+from config import Config
+from color import ColorLine
 
 from spacetime import SpaceTime
 
 settings_file = r'settings.txt'
-config_file = r'config.json'
-validations = 0
 
 opengl_version = (3,3)
 
-
-class ColorKnot:
-    def __init__(self, alpha: float, value: vec3) -> None:
-        self.alpha = alpha
-        self.value = value
-
-
-class ColorLine:
-    def __init__(self) -> None:
-        self.knots: list[ColorKnot] = []
-        self.normalized = False
-    
-    def add(self, alpha: float, value: vec3):
-        self.knots.append(ColorKnot(alpha, value))
-        self.knots.sort(key=lambda x: x.alpha)
-        self.normalized = False
-
-    @staticmethod
-    def _blend(a: vec3, b: vec3, alpha: float) -> vec3:
-        r = mathutils.lerp(a.x, b.x, alpha)
-        g = mathutils.lerp(a.y, b.y, alpha)
-        b = mathutils.lerp(a.z, b.z, alpha)
-        return vec3(r, g, b)
-
-    def normalize(self):
-        if not self.normalized:
-            self.normalized = True
-            for knot in self.knots:
-                knot.alpha = knot.alpha / self.knots[-1].alpha
-
-    def getColor(self, alpha: float) -> vec3:
-        self.normalize()
-        if alpha <= 0.0:
-            return self.knots[0].value
-        if alpha >= 1.0:
-            return self.knots[-1].value
-        for index in range(len(self.knots)):
-            if alpha <= self.knots[index].alpha:
-                alpha1 = self.knots[index - 1].alpha
-                alpha2 = self.knots[index].alpha
-                beta = (alpha - alpha1) / (alpha2 - alpha1)
-                color = self._blend(
-                    self.knots[index - 1].value,
-                    self.knots[index].value,
-                    beta
-                )
-                return color
-        return vec3(1)
-
-
-class Config:
-    def __init__(self):
-        self.values = {
-            'image_path': '',
-            'video_path': '',
-            'image_resx': 1920,
-            'image_resy': 1080,
-            'ffmpeg_path': '',
-            'video_codec': 'prores',
-            'video_format': 'mov',
-            'colors': [
-                {'alpha': 0.0, 'color': [0.2, 0.2, 1.0]},
-                {'alpha': 0.5, 'color': [0.3, 0.6, 0.5]},
-                {'alpha': 1.0, 'color': [1.0, 0.5, 0.2]}
-            ],
-            'rad_factor': 2.3,
-            'rad_pow': 0.8,
-            'max_faces': 20,
-            'faces_pow': 0.2
-        }
-        if os.path.exists(config_file):
-            with open(config_file, 'rt') as fp:
-                values = json.load(fp)
-                for key in list(values.keys()):
-                    if key in self.values:
-                        self.values[key] = values[key]
-
-    def get(self, key: str):
-        if key in self.values:
-            return self.values[key]
-        return ''
-            
 
 class MainView(rendering.View):
     def __init__(self, mainWindow: QtWidgets.QMainWindow, scene, parent=None):
@@ -195,11 +113,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.color = ColorLine()
         colors = self.config.get('colors')
         if colors:
-            for color in colors:
-                self.color.add(color['alpha'], vec3(*color['color']))
+            for knot in colors:
+                self.color.add(knot['alpha'], vec3(*knot['color']))
         
     def setUpUi(self):
-        self.resize(1000, 700)
+        self.resize(1920, 1080)
 
         self.setWindowTitle('View 3D Spacetime Rational Sets')
 
@@ -532,29 +450,29 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.adjust(self.view.scene.box())
             
         elif not len(self.view.scene.displays) and self.view.navigation.distance == 1.0:
-            print('first number setted...')
+            print('first number set...')
             self.view.scene.add(self.objs)
             self.view.scene.render(self.view)
             self.view.show()
             self.view.center()
             self.view.adjust(self.view.scene.box())
 
-        elif not len(self.view.scene.displays):
-            print('came from save image...')
-            self.view.removeEventFilter(self)
-            projection = deepcopy(self.view.projection)
-            navigation = deepcopy(self.view.navigation)
-            scene = rendering.Scene(self.objs, options=None)
-            self.viewLayout.takeAt(0)
-            self.view = MainView(self, scene)
-            self.view.projection = projection
-            self.view.navigation = navigation
-            self.viewLayout.addWidget(self.view)
-            self.view.show()
-            self.view.update()
+        # elif not len(self.view.scene.displays):
+        #     print('came from save image...')
+        #     self.view.removeEventFilter(self)
+        #     projection = deepcopy(self.view.projection)
+        #     navigation = deepcopy(self.view.navigation)
+        #     scene = rendering.Scene(self.objs, options=None)
+        #     self.viewLayout.takeAt(0)
+        #     self.view = MainView(self, scene)
+        #     self.view.projection = projection
+        #     self.view.navigation = navigation
+        #     self.viewLayout.addWidget(self.view)
+        #     self.view.show()
+        #     self.view.update()
 
         else:
-            print('continue setting number...')
+            print('continue setting numbers...')
             self.view.scene.displays.clear()
             self.view.scene.update(self.objs)
             self.view.scene.render(self.view)
