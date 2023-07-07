@@ -1,4 +1,3 @@
-import numpy
 from rationals2 import Rational, c
 
 
@@ -30,7 +29,7 @@ class Space(object):
 	def __init__(self, t, dim):
 		self.t = t
 		self.dim = dim
-		self.base = int(numpy.power(2, dim))
+		self.base = 2**dim
 		self.cells = []
 		if self.dim == 1:
 			for nx in range(t + 1):
@@ -67,7 +66,7 @@ class SpaceTime(object):
 		self.T = T
 		self.max = max
 		self.dim = dim
-		self.base = int(numpy.power(2, dim))
+		self.base = 2**dim
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
 		self.rationalSet = []
 
@@ -77,7 +76,7 @@ class SpaceTime(object):
 	def getCell(self, t, x, y=0, z=0):
 		return self.spaces[t].getCell(x, y, z)
 
-	def setRationalSet(self, n: numpy.longlong):
+	def setRationalSet(self, n: int):
 		self.rationalSet = []
 		for m in range(n + 1):
 			self.rationalSet.append(Rational(m, n, self.dim))

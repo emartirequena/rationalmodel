@@ -5,13 +5,13 @@ block_cipher = None
 
 
 a = Analysis(
-    ['src\\rationalmodel\\spacetime\\view3d.py'],
-    pathex=['src\\rationalmodel\\spacetime'],
+    ['src\\rationalmodel\\view3d\\view3d.py'],
+    pathex=['src\\rationalmodel\\view3d'],
     binaries=[
 	],
     datas=[
-		('.\\src\\rationalmodel\\spacetime\\settings.txt', '.'),
-		('.\\src\\rationalmodel\\spacetime\\config.json', '.'),
+		('.\\src\\rationalmodel\\view3d\\settings.txt', '.'),
+		('.\\src\\rationalmodel\\view3d\\config.json', '.'),
 		('C:\\Python310\\Lib\\site-packages\\madcad\\shaders\\*.*', '.\\madcad\\shaders'),
 		('C:\\Python310\\Lib\\site-packages\\madcad\\textures\\*.*', '.\\madcad\\textures'),
 	],
@@ -47,4 +47,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+	icon='icons/ojo-naturalista.ico'
 )

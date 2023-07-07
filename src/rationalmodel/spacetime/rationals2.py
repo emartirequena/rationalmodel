@@ -1,18 +1,18 @@
-from math import pow
+import numpy
 c = 0.5
 
 
 class Rational():
-    def __init__(self, m, n, dim=1):
+    def __init__(self, m: numpy.longlong, n: numpy.longlong, dim=1):
         self.m = m
         self.n = n
         self.dim = dim
         self.sequences = self.getSequence()
         self.period =self.getPeriod()
-        self.positions = [self.getPosition(t) for t in range(0, self.period + 1)]
+        self.positions = [self.getPosition(t) for t in range(self.period + 1)]
 
     def getSequence(self):
-        base = int(pow(2, self.dim))
+        base = int(2**self.dim)
         if self.m == 0:
             reminders = [0]
             digits = [0]
