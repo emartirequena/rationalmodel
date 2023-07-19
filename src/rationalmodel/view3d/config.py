@@ -22,7 +22,10 @@ class Config:
             'rad_factor': 2.3,
             'rad_pow': 0.8,
             'max_faces': 20,
-            'faces_pow': 0.2
+            'faces_pow': 0.2,
+            'histogram_resx': 200,
+            'histogram_resy': 50,
+            'histogram_max': 10000
         }
         if os.path.exists(config_file):
             with open(config_file, 'rt') as fp:

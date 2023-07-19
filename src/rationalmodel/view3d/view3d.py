@@ -1,24 +1,22 @@
-from decimal import Context
 import os
-import json
 import math
 import shutil
 import subprocess
 import sys
 from copy import deepcopy
-import numpy as np
 
 import moderngl as mgl
-from madcad import mathutils, vec3, uvec2, fmat4, rendering, settings, uvsphere, Axis, X, Y, Z, Box, render
-from moderngl import create_standalone_context
+from madcad import vec3, fmat4, rendering, settings, uvsphere, Axis, X, Y, Z, Box
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
+
+from spacetime import SpaceTime
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
 from utils import getDivisorsAndFactors, divisors
 from config import Config
 from color import ColorLine
-
-from spacetime import SpaceTime
+from renderView import RenderView
+from histogram import Histogram
 
 settings_file = r'settings.txt'
 
@@ -26,7 +24,7 @@ opengl_version = (3,3)
 
 
 class MainView(rendering.View):
-    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene, parent=None):
+    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene: rendering.Scene, parent: QtWidgets.QWidget=None):
         self.mainWindow = mainWindow
         super().__init__(scene, parent=parent)
 
@@ -41,7 +39,7 @@ class MainView(rendering.View):
             percent = 100.0 * float(cell.count) / float(max)
             text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
             self.mainWindow.setStatus(text)
-            return True
+            # return True
         return False
 
     def control(self, key, evt):
@@ -52,47 +50,6 @@ class MainView(rendering.View):
         return super().control(key, evt)
 
 
-class RenderView(rendering.Offscreen):
-    def __init__(self, scene, size=uvec2(1920, 1080), navigation=None, projection=None):
-        self.scene = scene
-        self.projection = projection
-        self.navigation = navigation
-
-        self.uniforms = {'proj':fmat4(1), 'view':fmat4(1), 'projview':fmat4(1)}	# last frame rendering constants
-        self.targets = []
-        self.steps = []
-        self.step = 0
-        self.stepi = 0
-
-        # dump targets
-        self.map_depth = None
-        self.map_idents = None
-        self.fresh = set()	# set of refreshed internal variables since the last render
-
-        self.scene.ctx = mgl.create_standalone_context(share=True)
-
-        self.init(size)
-        self.preload()
-
-    def init(self, size):
-        w, h = size
-
-        ctx = self.scene.ctx
-        assert ctx, 'context is not initialized'
-
-        # self.fb_frame is already created and sized by Qt
-        self.fb_screen = ctx.simple_framebuffer(size)
-        self.fb_ident = ctx.simple_framebuffer(size, components=3, dtype='f1')
-        self.targets = [ ('screen', self.fb_screen, self.setup_screen),
-                            ('ident', self.fb_ident, self.setup_ident)]
-        self.map_ident = np.empty((h,w), dtype='u2')
-        self.map_depth = np.empty((h,w), dtype='f4')
-
-    def resize(self, size):
-        if size != self.fb_screen.size:
-            self.init(size)
-
-
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -101,10 +58,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objs = dict()
         self.list_objs = list()
         self.view = None
+        self.histogram = None
         self.rendering = False
-        settings.load(settings_file)
-        self.make_view()
-        self.showMaximized()
         self.spacetime = None
         self.factors = ''
         self.num = 0
@@ -115,6 +70,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if colors:
             for knot in colors:
                 self.color.add(knot['alpha'], vec3(*knot['color']))
+        self.make_view(0)
+        self.showMaximized()
         
     def setUpUi(self):
         self.resize(1920, 1080)
@@ -213,6 +170,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menu = self.menuBar()
         self.mainMenu = QtWidgets.QMenu('Main')
         self.actionExit = QtWidgets.QAction('Exit', self)
+        self.actionExit.setShortcut('Esc')
         self.actionExit.triggered.connect(self.close)
         self.mainMenu.addAction(self.actionExit)
         self.menu.addMenu(self.mainMenu)
@@ -278,7 +236,7 @@ class MainWindow(QtWidgets.QMainWindow):
         return path
 
     def _saveImages(self, init_time, end_time):
-        self.setStatus('Saving sequence...')
+        self.setStatus('Saving images...')
         self.rendering = True
         
         projection = deepcopy(self.view.projection)
@@ -297,20 +255,25 @@ class MainWindow(QtWidgets.QMainWindow):
         video_codec = self.config.get('video_codec')
 
         scene = rendering.Scene()
-        screen = RenderView(scene, projection=projection, navigation=navigation)
-        screen.resize((image_resx, image_resy))
+        view = RenderView(scene, projection=projection, navigation=navigation)
+        view.resize((image_resx, image_resy))
 
+        self.histogram.prepare_save()
         for time in range(init_time, end_time + 1):
-            objs = deepcopy(self.make_objects(time=time, make_view=False))
-            scene.displays.clear()
+            objs = self.make_objects(time=time, make_view=False)
             scene.add(objs)
-            img = screen.render()
+            img = view.render()
+            hist_img = self.histogram.save_image(time)
+            img.alpha_composite(hist_img)
             img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            scene.displays.clear()
             del objs
         del projection
         del navigation
         del scene
-        del screen
+        del view
+        self.histogram.end_save()
 
         # if there are more tha one image, save video
         if init_time != end_time:
@@ -339,7 +302,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # self.view.scene.displays.clear()
         self.rendering = False
-        self.setStatus('Sequence saved...')
+        self.setStatus('Images saved...')
 
     def saveImage(self):
         self._saveImages(self.time.value(), self.time.value())
@@ -431,14 +394,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.list_objs.append(cube)
 
         if isinstance(self.list_objs, list):
-            self.objs = dict(enumerate([self.list_objs]))
+            self.objs = dict(enumerate(self.list_objs))
 
         if make_view:
-            self.make_view()
+            self.make_view(time)
         else:
             return self.objs
 
-    def make_view(self):
+    def make_view(self, time):
 
         if not self.view:
             print("view doesn't exists...")
@@ -447,7 +410,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.viewLayout.addWidget(self.view)
             self.view.show()
             self.view.center()
-            self.view.adjust(self.view.scene.box())
+            # self.view.adjust(self.view.scene.box())
+            self.view.adjust()
             
         elif not len(self.view.scene.displays) and self.view.navigation.distance == 1.0:
             print('first number set...')
@@ -455,15 +419,26 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.scene.render(self.view)
             self.view.show()
             self.view.center()
-            self.view.adjust(self.view.scene.box())
+            # self.view.adjust(self.view.scene.box())
+            self.view.adjust()
+            if not self.histogram:
+                self.histogram = Histogram(parent=self)
+            self.histogram.set_spacetime(self.spacetime)
+            self.histogram.set_number(self.number.value())
+            self.histogram.set_time(time)
+            self.histogram.show()
 
         else:
-            print('continue setting numbers...')
+            print('continue setting number...')
             self.view.scene.displays.clear()
             self.view.scene.update(self.objs)
             self.view.scene.render(self.view)
             self.view.show()
             self.view.update()
+            self.histogram.set_spacetime(self.spacetime)
+            self.histogram.set_number(self.number.value())
+            self.histogram.set_time(time)
+            self.histogram.show()
 
         del self.objs
         self.objs = {}
@@ -517,7 +492,7 @@ class MainWindow(QtWidgets.QMainWindow):
         is_even: bool = True if T % 2 == 0 else False
         specials = []
         if is_even:
-            specials = divisors(a**(T//2) + 1)
+            specials = divisors(a**(T // 2) + 1)
         else:
             specials = [c**b - 1]
         for record in self.numbers.values():
@@ -545,6 +520,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
+    settings.load(settings_file)
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QtWidgets.QApplication(sys.argv)
     wi = MainWindow()

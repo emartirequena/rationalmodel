@@ -1,4 +1,6 @@
 .git/
 *.pyc
+*.zip
+*.png
 build/
 dist/
