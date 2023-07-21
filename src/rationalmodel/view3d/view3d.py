@@ -16,7 +16,7 @@ from utils import getDivisorsAndFactors, divisors
 from config import Config
 from color import ColorLine
 from renderView import RenderView
-from histogram import Histogram
+# from histogram import Histogram
 
 settings_file = r'settings.txt'
 
@@ -39,7 +39,7 @@ class MainView(rendering.View):
             percent = 100.0 * float(cell.count) / float(max)
             text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
             self.mainWindow.setStatus(text)
-            # return True
+            return True
         return False
 
     def control(self, key, evt):
@@ -220,7 +220,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.timeWidget.setValue(t + 1)
 
     def setStatus(self, txt: str):
-        print(txt)
+        print(f'status: {txt}')
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
@@ -254,26 +254,27 @@ class MainWindow(QtWidgets.QMainWindow):
         video_format = self.config.get('video_format')
         video_codec = self.config.get('video_codec')
 
-        scene = rendering.Scene()
+        scene = rendering.Scene(options=None)
         view = RenderView(scene, projection=projection, navigation=navigation)
         view.resize((image_resx, image_resy))
 
-        self.histogram.prepare_save()
+        # self.histogram.prepare_save(ctx=scene.ctx)
         for time in range(init_time, end_time + 1):
+            scene.displays.clear()
             objs = self.make_objects(time=time, make_view=False)
             scene.add(objs)
             img = view.render()
-            hist_img = self.histogram.save_image(time)
-            img.alpha_composite(hist_img)
+            # hist_img = self.histogram.save_image(time)
+            # img.alpha_composite(hist_img)
             img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-            hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            # hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
         del projection
         del navigation
         del scene
         del view
-        self.histogram.end_save()
+        # self.histogram.end_save()
 
         # if there are more tha one image, save video
         if init_time != end_time:
@@ -367,6 +368,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         rad_factor = self.config.get('rad_factor')
         rad_pow = self.config.get('rad_pow')
+        rad_min = self.config.get('rad_min')
         max_faces = self.config.get('max_faces')
         faces_pow = self.config.get('faces_pow')
 
@@ -378,8 +380,7 @@ class MainWindow(QtWidgets.QMainWindow):
             x, y, z = cell['pos']
             alpha = float(num) / float(max)
             rad = math.pow(alpha / rad_factor, rad_pow)
-            if rad < 0.02:
-                rad = 0.02
+            if rad < rad_min: rad = rad_min
             sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             sphere.option(color=self.color.getColor(alpha))
             self.list_objs.append(sphere)
@@ -387,14 +388,19 @@ class MainWindow(QtWidgets.QMainWindow):
         axisX = Axis(vec3(0), X)
         axisY = Axis(vec3(0), Y)
         axisZ = Axis(vec3(0), Z)
-        self.list_objs.append([axisX, axisY, axisZ])
+        self.list_objs.append(axisX)
+        self.list_objs.append(axisY)
+        self.list_objs.append(axisZ)
 
         if time > 0:
             cube = Box(center=vec3(0), width=time)
             self.list_objs.append(cube)
 
-        if isinstance(self.list_objs, list):
-            self.objs = dict(enumerate(self.list_objs))
+        self.objs = {}
+        for i in range(len(self.list_objs)):
+            self.objs[self.config.getKey()] = self.list_objs[i]
+
+        print(f"key: {self.config.values['objects_key']}")
 
         if make_view:
             self.make_view(time)
@@ -410,7 +416,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.viewLayout.addWidget(self.view)
             self.view.show()
             self.view.center()
-            # self.view.adjust(self.view.scene.box())
             self.view.adjust()
             
         elif not len(self.view.scene.displays) and self.view.navigation.distance == 1.0:
@@ -419,26 +424,25 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.scene.render(self.view)
             self.view.show()
             self.view.center()
-            # self.view.adjust(self.view.scene.box())
             self.view.adjust()
-            if not self.histogram:
-                self.histogram = Histogram(parent=self)
-            self.histogram.set_spacetime(self.spacetime)
-            self.histogram.set_number(self.number.value())
-            self.histogram.set_time(time)
-            self.histogram.show()
+            # if not self.histogram: self.histogram = Histogram(parent=self)
+            # self.histogram.set_spacetime(self.spacetime)
+            # self.histogram.set_number(int(self.number.value()))
+            # self.histogram.set_time(time)
+            # self.histogram.show()
 
         else:
             print('continue setting number...')
             self.view.scene.displays.clear()
-            self.view.scene.update(self.objs)
+            self.view.scene.add(self.objs)
             self.view.scene.render(self.view)
             self.view.show()
             self.view.update()
-            self.histogram.set_spacetime(self.spacetime)
-            self.histogram.set_number(self.number.value())
-            self.histogram.set_time(time)
-            self.histogram.show()
+            # if not self.histogram: self.histogram = Histogram(parent=self)
+            # self.histogram.set_spacetime(self.spacetime)
+            # self.histogram.set_number(int(self.number.value()))
+            # self.histogram.set_time(time)
+            # self.histogram.show()
 
         del self.objs
         self.objs = {}
@@ -521,8 +525,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
 if __name__=="__main__":
     settings.load(settings_file)
-    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts)
     app = QtWidgets.QApplication(sys.argv)
+    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
     wi = MainWindow()
     wi.show()
     sys.exit(app.exec())

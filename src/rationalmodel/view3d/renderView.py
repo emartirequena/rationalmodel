@@ -4,7 +4,7 @@ from madcad import rendering, uvec2, fmat4
 
 
 class RenderView(rendering.Offscreen):
-    def __init__(self, scene, size=uvec2(1920, 1080), navigation=None, projection=None, share=True):
+    def __init__(self, scene, size=uvec2(1920, 1080), navigation=None, projection=None, share=True, ctx=None):
         self.scene = scene
         self.projection = projection
         self.navigation = navigation
@@ -20,7 +20,10 @@ class RenderView(rendering.Offscreen):
         self.map_idents = None
         self.fresh = set()	# set of refreshed internal variables since the last render
 
-        self.scene.ctx = mgl.create_standalone_context(share=share)
+        if not ctx:
+            self.scene.ctx = mgl.create_standalone_context(share=share)
+        else:
+            self.scene.ctx = ctx
 
         self.init(size)
         self.preload()

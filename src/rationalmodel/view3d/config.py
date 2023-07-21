@@ -21,11 +21,13 @@ class Config:
             ],
             'rad_factor': 2.3,
             'rad_pow': 0.8,
+            'rad_min': 0.02,
             'max_faces': 20,
             'faces_pow': 0.2,
             'histogram_resx': 200,
             'histogram_resy': 50,
-            'histogram_max': 10000
+            'histogram_max': 10000,
+            'objects_key': 1
         }
         if os.path.exists(config_file):
             with open(config_file, 'rt') as fp:
@@ -38,3 +40,8 @@ class Config:
         if key in self.values:
             return self.values[key]
         return ''
+    
+    def getKey(self):
+        key = self.values['objects_key']
+        self.values['objects_key'] += 1
+        return key
