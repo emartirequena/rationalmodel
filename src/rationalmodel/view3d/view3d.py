@@ -270,6 +270,10 @@ class MainWindow(QtWidgets.QMainWindow):
             hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
+            gc.collect()
+            gc.collect()
+            gc.collect()
+            print(f'garbage: {gc.get_count()}')
         del projection
         del navigation
         del scene
@@ -278,6 +282,7 @@ class MainWindow(QtWidgets.QMainWindow):
         gc.collect()
         gc.collect()
         gc.collect()
+        print(f'garbage: {gc.get_count()}')
 
         # if there are more tha one image, save video
         if init_time != end_time:
@@ -448,6 +453,9 @@ class MainWindow(QtWidgets.QMainWindow):
         del self.objs
         self.objs = {}
         gc.collect()
+        gc.collect()
+        gc.collect()
+        print(f'garbage: {gc.get_count()}')
         self.rendering = False
         self.setStatus(f'{self.count} objects created at frame {self.timeWidget.value()}...')
         
