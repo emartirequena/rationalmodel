@@ -271,18 +271,12 @@ class MainWindow(QtWidgets.QMainWindow):
             scene.displays.clear()
             del objs
             gc.collect()
-            gc.collect()
-            gc.collect()
-            print(f'garbage: {gc.get_count()}')
         del projection
         del navigation
         del scene
         del view
         self.histogram.end_save()
         gc.collect()
-        gc.collect()
-        gc.collect()
-        print(f'garbage: {gc.get_count()}')
 
         # if there are more tha one image, save video
         if init_time != end_time:
@@ -323,6 +317,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.number.value() == 0:
             return
         
+        gc.collect()
+        
         self.setStatus('Creating incremental spacetime...')
         self.rendering = True
 
@@ -355,8 +351,6 @@ class MainWindow(QtWidgets.QMainWindow):
         list_objs = []
 
         self.setStatus(f'Drawing frame: {time} ...')
-
-        # self.config.values['objects_key'] = 1
 
         self.num = 0
         max = -1
@@ -453,9 +447,6 @@ class MainWindow(QtWidgets.QMainWindow):
         del self.objs
         self.objs = {}
         gc.collect()
-        gc.collect()
-        gc.collect()
-        print(f'garbage: {gc.get_count()}')
         self.rendering = False
         self.setStatus(f'{self.count} objects created at frame {self.timeWidget.value()}...')
         
