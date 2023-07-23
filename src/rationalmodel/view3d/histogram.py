@@ -1,4 +1,5 @@
 from copy import deepcopy
+import gc
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 import moderngl as mgl, glm
@@ -8,31 +9,6 @@ from madcad.rendering import View, Scene, Orthographic, Turntable
 from config import Config
 from color import ColorLine
 from renderView import RenderView
-
-# class HistView(View):
-#     def adjust(self, box:Box=None):
-#         ''' Make the navigation camera large enough to get the given box in.
-#             This is changing the zoom level
-#         '''
-#         if not box:	box = self.scene.box()
-#         if box.isempty():
-#             return
-
-#         # get the most distant point to the focal axis
-#         invview = affineInverse(self.navigation.matrix())
-#         camera, look = fvec3(invview[3]), fvec3(invview[2])
-#         dist = length2(noproject(fvec3(box.center)-camera, look)) + max(glm.abs(box.width))/2 * 1.1
-#         if not dist > 1e-6:	
-#             return
-
-#         # adjust navigation distance
-#         if isinstance(self.projection, Perspective):
-#             self.navigation.distance = dist / tan(self.projection.fov/2)
-#         elif isinstance(self.projection, Orthographic):
-#             self.navigation.distance = dist / self.projection.size
-#             print(f'hist: ------- dist: {dist:0.2f}, size: {self.projection.size:0.2f}, distance: {self.navigation.distance:0.2f}')
-#         else:
-#             raise TypeError('projection {} not supported'.format(type(self.projection)))
 
 
 class Histogram(QtWidgets.QWidget):
@@ -113,6 +89,7 @@ class Histogram(QtWidgets.QWidget):
             self.view.navigation.distance = self.bar_height * 2.5
 
         del objs
+        gc.collect()
         self.view.show()
         self.view.update()
 
@@ -136,9 +113,6 @@ class Histogram(QtWidgets.QWidget):
                 count += 1
 
         print(f'hist: ------- time: {self.time}, count: {count}, max: {max}, len: {len(dict_objs)}')
-
-        # axisX = Axis(vec3(0), X)
-        # dict_keys[self.config.getKey()] = axisX
 
         for num in dict_objs.keys():
             alpha = float(num) / float(max)
@@ -187,7 +161,6 @@ class Histogram(QtWidgets.QWidget):
         self.save_navigation = None
         self.save_scene = None
         self.save_view = None
-
 
 if __name__ == '__main__':
     import sys

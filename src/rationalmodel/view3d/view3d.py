@@ -270,13 +270,12 @@ class MainWindow(QtWidgets.QMainWindow):
             hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
+            gc.collect()
         del projection
         del navigation
         del scene
         del view
         self.histogram.end_save()
-        gc.collect()
-        gc.collect()
         gc.collect()
 
         # if there are more tha one image, save video
@@ -318,6 +317,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.number.value() == 0:
             return
         
+        gc.collect()
+        
         self.setStatus('Creating incremental spacetime...')
         self.rendering = True
 
@@ -350,8 +351,6 @@ class MainWindow(QtWidgets.QMainWindow):
         list_objs = []
 
         self.setStatus(f'Drawing frame: {time} ...')
-
-        # self.config.values['objects_key'] = 1
 
         self.num = 0
         max = -1
