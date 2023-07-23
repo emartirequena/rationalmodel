@@ -1,4 +1,5 @@
-from madcad import vec3, mathutils
+from madcad import vec3
+from madcad.mathutils import lerp
 
 
 class ColorKnot:
@@ -12,19 +13,19 @@ class ColorLine:
         self.knots: list[ColorKnot] = []
         self.normalized = False
     
-    def add(self, alpha: float, value: vec3):
+    def add(self, alpha: float, value: vec3) -> None:
         self.knots.append(ColorKnot(alpha, value))
         self.knots.sort(key=lambda x: x.alpha)
         self.normalized = False
 
     @staticmethod
     def _blend(a: vec3, b: vec3, alpha: float) -> vec3:
-        r = mathutils.lerp(a.x, b.x, alpha)
-        g = mathutils.lerp(a.y, b.y, alpha)
-        b = mathutils.lerp(a.z, b.z, alpha)
+        r = lerp(a.x, b.x, alpha)
+        g = lerp(a.y, b.y, alpha)
+        b = lerp(a.z, b.z, alpha)
         return vec3(r, g, b)
 
-    def normalize(self):
+    def normalize(self) -> None:
         if not self.normalized:
             self.normalized = True
             for knot in self.knots:
@@ -48,4 +49,3 @@ class ColorLine:
                 )
                 return color
         return vec3(1)
-

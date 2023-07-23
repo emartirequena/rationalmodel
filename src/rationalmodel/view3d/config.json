@@ -13,6 +13,10 @@
     ],
     "rad_factor": 2.3,
     "rad_pow": 0.8,
+    "rad_min": 0.02,
     "max_faces": 20,
-    "faces_pow": 0.2
+    "faces_pow": 0.2,
+    "histogram_resx": 500,
+    "histogram_resy": 100,
+    "histogram_max": 10000
 }

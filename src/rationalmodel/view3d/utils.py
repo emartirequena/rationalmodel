@@ -22,7 +22,7 @@ def cartesianproduct(lists) :
 def primefactors(n: int) -> list[int]:
     """lists prime factors, from greatest to smallest"""
     i:int = 3
-    limit:int = n // (4096 if n >= 100000000 else 4)
+    limit:int = n // (4 if n < 100000000 else 4096)
     while i <= limit:
         if n % i == 0:
             lst: list[int] = primefactors(n // i)
