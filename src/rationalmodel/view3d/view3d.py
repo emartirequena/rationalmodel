@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import sys
 from copy import deepcopy
+import gc
 
 import moderngl as mgl
 from madcad import vec3, fmat4, rendering, settings, uvsphere, Axis, X, Y, Z, Box
@@ -16,7 +17,7 @@ from utils import getDivisorsAndFactors, divisors
 from config import Config
 from color import ColorLine
 from renderView import RenderView
-# from histogram import Histogram
+from histogram import Histogram
 
 settings_file = r'settings.txt'
 
@@ -55,8 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
         super().__init__()
         self.setUpUi()
         self.count = 0
-        self.objs = dict()
-        self.list_objs = list()
+        self.objs = {}
         self.view = None
         self.histogram = None
         self.rendering = False
@@ -258,23 +258,26 @@ class MainWindow(QtWidgets.QMainWindow):
         view = RenderView(scene, projection=projection, navigation=navigation)
         view.resize((image_resx, image_resy))
 
-        # self.histogram.prepare_save(ctx=scene.ctx)
+        self.histogram.prepare_save(ctx=scene.ctx)
         for time in range(init_time, end_time + 1):
             scene.displays.clear()
             objs = self.make_objects(time=time, make_view=False)
             scene.add(objs)
             img = view.render()
-            # hist_img = self.histogram.save_image(time)
-            # img.alpha_composite(hist_img)
+            hist_img = self.histogram.save_image(time)
+            img.alpha_composite(hist_img)
             img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-            # hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
         del projection
         del navigation
         del scene
         del view
-        # self.histogram.end_save()
+        self.histogram.end_save()
+        gc.collect()
+        gc.collect()
+        gc.collect()
 
         # if there are more tha one image, save video
         if init_time != end_time:
@@ -301,7 +304,6 @@ class MainWindow(QtWidgets.QMainWindow):
             dest_video = os.path.join(video_path, video_file_name)
             shutil.copyfile(out_video, dest_video)
         
-        # self.view.scene.displays.clear()
         self.rendering = False
         self.setStatus('Images saved...')
 
@@ -337,10 +339,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def make_objects(self, time:int=0, make_view:bool=True):
         self.rendering = True
 
-        if self.list_objs:
-            for obj in self.list_objs:
-                del obj
-
         if not self.spacetime:
             return
         if make_view:
@@ -349,9 +347,11 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         space = self.spacetime.spaces[time]
 
-        self.list_objs = []
+        list_objs = []
 
         self.setStatus(f'Drawing frame: {time} ...')
+
+        # self.config.values['objects_key'] = 1
 
         self.num = 0
         max = -1
@@ -380,25 +380,26 @@ class MainWindow(QtWidgets.QMainWindow):
             x, y, z = cell['pos']
             alpha = float(num) / float(max)
             rad = math.pow(alpha / rad_factor, rad_pow)
-            if rad < rad_min: rad = rad_min
+            if rad < rad_min: 
+                rad = rad_min
             sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             sphere.option(color=self.color.getColor(alpha))
-            self.list_objs.append(sphere)
+            list_objs.append(sphere)
 
         axisX = Axis(vec3(0), X)
         axisY = Axis(vec3(0), Y)
         axisZ = Axis(vec3(0), Z)
-        self.list_objs.append(axisX)
-        self.list_objs.append(axisY)
-        self.list_objs.append(axisZ)
+        list_objs.append(axisX)
+        list_objs.append(axisY)
+        list_objs.append(axisZ)
 
         if time > 0:
             cube = Box(center=vec3(0), width=time)
-            self.list_objs.append(cube)
+            list_objs.append(cube)
 
         self.objs = {}
-        for i in range(len(self.list_objs)):
-            self.objs[self.config.getKey()] = self.list_objs[i]
+        for i in range(len(list_objs)):
+            self.objs[self.config.getKey()] = list_objs[i]
 
         print(f"key: {self.config.values['objects_key']}")
 
@@ -425,11 +426,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.show()
             self.view.center()
             self.view.adjust()
-            # if not self.histogram: self.histogram = Histogram(parent=self)
-            # self.histogram.set_spacetime(self.spacetime)
-            # self.histogram.set_number(int(self.number.value()))
-            # self.histogram.set_time(time)
-            # self.histogram.show()
+            if not self.histogram: self.histogram = Histogram(parent=self)
+            self.histogram.set_spacetime(self.spacetime)
+            self.histogram.set_number(int(self.number.value()))
+            self.histogram.set_time(time)
+            self.histogram.show()
 
         else:
             print('continue setting number...')
@@ -438,14 +439,15 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.scene.render(self.view)
             self.view.show()
             self.view.update()
-            # if not self.histogram: self.histogram = Histogram(parent=self)
-            # self.histogram.set_spacetime(self.spacetime)
-            # self.histogram.set_number(int(self.number.value()))
-            # self.histogram.set_time(time)
-            # self.histogram.show()
+            if not self.histogram: self.histogram = Histogram(parent=self)
+            self.histogram.set_spacetime(self.spacetime)
+            self.histogram.set_number(int(self.number.value()))
+            self.histogram.set_time(time)
+            self.histogram.show()
 
         del self.objs
         self.objs = {}
+        gc.collect()
         self.rendering = False
         self.setStatus(f'{self.count} objects created at frame {self.timeWidget.value()}...')
         

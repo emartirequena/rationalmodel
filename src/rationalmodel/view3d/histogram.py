@@ -1,9 +1,9 @@
 from copy import deepcopy
 
 from PyQt5 import QtWidgets, QtCore, QtGui
-import moderngl as mgl
+import moderngl as mgl, glm
 from madcad import brick, vec3, Axis, X, settings, fvec3
-from madcad.rendering import View, Scene, Orthographic, Turntable, Offscreen
+from madcad.rendering import View, Scene, Orthographic, Turntable
 
 from config import Config
 from color import ColorLine
@@ -21,7 +21,7 @@ from renderView import RenderView
 #         # get the most distant point to the focal axis
 #         invview = affineInverse(self.navigation.matrix())
 #         camera, look = fvec3(invview[3]), fvec3(invview[2])
-#         dist = length(noproject(fvec3(box.center)-camera, look)) + max(glm.abs(box.width))/2 * 1.1
+#         dist = length2(noproject(fvec3(box.center)-camera, look)) + max(glm.abs(box.width))/2 * 1.1
 #         if not dist > 1e-6:	
 #             return
 
@@ -64,7 +64,7 @@ class Histogram(QtWidgets.QWidget):
             self.move(pos.x() + 15, pos.y() + 15)
 
         palette = self.palette()
-        palette.setColor(QtGui.QPalette.Window, QtGui.QColor('white'))
+        palette.setColor(QtGui.QPalette.Window, QtGui.QColor('gray'))
         self.setPalette(palette)
         self.setAutoFillBackground(True)
         self.change_flag = True
@@ -99,17 +99,18 @@ class Histogram(QtWidgets.QWidget):
             self.layout.addWidget(self.view)
             self.view.preload()
         
+        self.bar_height = float(self.hist_max * self.resy) / float(self.resx)
+        self.bar_width = 0.5
         self.view.scene.displays.clear()
         objs = self._make_objs()
         self.view.scene.add(objs)
         self.view.scene.render(self.view)
 
         if self.change_flag:
-            height = float(self.hist_max * self.resy) / float(self.resx)
-            print(f'hist: ------- number: {self.hist_max}, resx: {self.resx}, resy: {self.resy}, height: {height}')
-            self.view.center(center=fvec3(self.hist_max * 0.5, 1, height))
-            self.view.look(fvec3(self.hist_max * 0.5, 0, height))
-            self.view.navigation.distance = height * 2.5
+            print(f'hist: ------- number: {self.hist_max}, resx: {self.resx}, resy: {self.resy}, height: {self.bar_height}')
+            self.view.center(center=fvec3(self.hist_max * 0.5, 1, self.bar_height))
+            self.view.look(fvec3(self.hist_max * 0.5, 0, self.bar_height))
+            self.view.navigation.distance = self.bar_height * 2.5
 
         del objs
         self.view.show()
@@ -140,12 +141,11 @@ class Histogram(QtWidgets.QWidget):
         # dict_keys[self.config.getKey()] = axisX
 
         for num in dict_objs.keys():
-            height = float(self.hist_max * self.resy) / float(self.resx)
             alpha = float(num) / float(max)
             pos = float(num)
             obj = brick(
-                center=vec3(pos + 0.25, 0.25, height), 
-                width=vec3(0.5, 0.5, height * 2)
+                center=vec3(pos + self.bar_width * 0.5, self.bar_width * 0.5, self.bar_height), 
+                width=vec3(self.bar_width, self.bar_width, self.bar_height * 2)
             )
             obj.option(color=self.color.getColor(alpha))
             dict_keys[self.config.getKey()] = obj
@@ -197,7 +197,7 @@ if __name__ == '__main__':
 
     settings_file = r'settings.txt'
 
-    spacetime = SpaceTime(T=10, max=30, dim=3)
+    spacetime = SpaceTime(T=8, max=24, dim=3)
     spacetime.setRationalSet(n=99)
     spacetime.addRationalSet()
 
@@ -208,7 +208,7 @@ if __name__ == '__main__':
     histogram = Histogram()
     histogram.set_number(99)
     histogram.set_spacetime(spacetime)
-    histogram.set_time(30)
+    histogram.set_time(24)
     histogram.view.update()
     print('set_time...')
     histogram.show()
