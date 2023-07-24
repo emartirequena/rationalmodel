@@ -89,7 +89,6 @@ class Histogram(QtWidgets.QWidget):
             self.view.navigation.distance = self.bar_height * 2.5
 
         del objs
-        gc.collect()
         self.view.show()
         self.view.update()
 

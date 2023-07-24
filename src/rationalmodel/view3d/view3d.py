@@ -317,8 +317,6 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.number.value() == 0:
             return
         
-        gc.collect()
-        
         self.setStatus('Creating incremental spacetime...')
         self.rendering = True
 
