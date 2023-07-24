@@ -1,6 +1,6 @@
 .git/
 *.pyc
 *.zip
-*.png
+*.ico
 build/
 dist/
