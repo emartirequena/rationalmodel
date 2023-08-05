@@ -6,4 +6,7 @@
 *.xls*
 build/
 dist/
+*.ico
+build/
+dist/
 docs/
