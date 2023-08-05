@@ -1,6 +1,12 @@
 .git/
 *.pyc
 *.zip
+*.png
+*.doc*
+*.xls*
+build/
+dist/
 *.ico
 build/
 dist/
+docs/

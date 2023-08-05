@@ -73,7 +73,7 @@ class Histogram(QtWidgets.QWidget):
                 navigation=Turntable()
             )
             self.layout.addWidget(self.view)
-            self.view.preload()
+            # self.view.preload()
         
         self.bar_height = float(self.hist_max * self.resy) / float(self.resx)
         self.bar_width = 0.5

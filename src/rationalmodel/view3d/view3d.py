@@ -17,7 +17,7 @@ from utils import getDivisorsAndFactors, divisors
 from config import Config
 from color import ColorLine
 from renderView import RenderView
-from histogram import Histogram
+from histogram2 import Histogram
 
 settings_file = r'settings.txt'
 
