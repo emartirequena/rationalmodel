@@ -2,5 +2,8 @@
 *.pyc
 *.zip
 *.png
+*.doc*
+*.xls*
 build/
 dist/
+docs/
