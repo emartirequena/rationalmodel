@@ -184,6 +184,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionSaveVideo.setShortcut('V')
         self.actionSaveVideo.triggered.connect(self.saveVideo)
         self.menuUtils.addAction(self.actionSaveVideo)
+        self.menuUtils.addSeparator()
+        self.actionFitHistogram = QtWidgets.QAction('Fit Histogram', self)
+        self.actionFitHistogram.setShortcut('F')
+        self.actionFitHistogram.triggered.connect(self.fit_histogram)
+        self.menuUtils.addAction(self.actionFitHistogram)
         self.menu.addMenu(self.menuUtils)
 
         self.menuTime = QtWidgets.QMenu('Time')
@@ -448,6 +453,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.rendering = False
         self.setStatus(f'{self.count} objects created at frame {self.timeWidget.value()}...')
         
+    def fit_histogram(self):
+        if not self.histogram:
+            return
+        self.histogram.scene.fit()
+        self.histogram.reset()
+        self.histogram.update()
+
     def get_factors(self, number):
         factors = self.numbers[number]['factors']
         labels = []

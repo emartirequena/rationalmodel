@@ -13,8 +13,9 @@ def lerp(t, ta, a, tb, b):
 
 
 class Item:
-    def __init__(self, x: int, color: vec3) -> None:
+    def __init__(self, x: int, height: int, color: vec3) -> None:
         self.x = x
+        self.height = height
         self.color = (
             int(255 * color.x), 
             int(255 * color.y), 
@@ -32,17 +33,13 @@ class Scene:
     def clear(self):
         self.items = []
 
-    def add(self, x: int, color: vec3):
-        print(f'add item: {x:.2f}')
-        self.items.append(Item(x, color))
+    def add(self, x: int, height: int, color: vec3):
+        self.items.append(Item(x, height, color))
 
     def scale(self, x: float, step: float):
         factor = 1.05 if step > 0. else 1./1.05
         self.scl *= factor
-        box = (self.max - self.min) * self.scl
-        min = self.min * self.scl
-        self.ox += (x - min) / self.width
-        print(f'scale: pos: {x:.2f}, scl: {self.scl:.2f}, left: {self.ox:.2f}, box: {box:.2f}')
+        self.ox -= (x - (self.max - self.min) * self.scl) / self.width
 
     def fit(self):
         self.min =  1000000
@@ -54,11 +51,9 @@ class Scene:
                 self.max = item.x
         self.scl = self.width / (self.max - self.min)
         self.ox = -self.min * self.scl
-        print(f'min: {self.min:.2f}, max: {self.max:.2f}, left: {self.ox:.2f}, scale: {self.scl:.2f}')
 
     def translate(self, dist: float):
         self.ox += dist
-        print(f'dist: {dist:.2f}, ox: {self.ox:.2f}, scl: {self.scl:.2f}')
 
     def render(self):
         img = Image.new('RGB', (self.width, self.height), (0, 0, 0))
@@ -66,7 +61,8 @@ class Scene:
         draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
         for item in self.items:
             x = int(item.x * self.scl + self.ox)
-            draw.line((x, 1, x, self.height-2), (item.color), 3)
+            height = np.power(item.height, 0.5) * self.height 
+            draw.line((x, self.height - height, x, self.height), (item.color), 3)
         return img
 
     @staticmethod
@@ -153,9 +149,6 @@ class Histogram(QtWidgets.QWidget):
         self.reset()
 
     def _make_items(self):
-        # if not self.change_flag:
-        #     return
-        
         space = self.spacetime.spaces[self.time]
 
         dict_objs = {}
@@ -170,7 +163,7 @@ class Histogram(QtWidgets.QWidget):
                     max = num
                 if num not in dict_objs:
                     dict_objs[num] = 0
-                dict_objs[num] += num
+                dict_objs[num] += 1
                 count += 1
 
         print(f'hist: ------- time: {self.time}, count: {count}, max: {max}, len: {len(dict_objs)}')
@@ -180,7 +173,8 @@ class Histogram(QtWidgets.QWidget):
             alpha = float(num) / float(max)
             pos = float(num)
             color = self.color.getColor(alpha)
-            self.scene.add(pos, color)
+            height = float(dict_objs[num]) / float(count)
+            self.scene.add(pos, height, color)
 
     def prepare_save(self, ctx=None):
         self.old_time = self.time
@@ -214,6 +208,7 @@ class Histogram(QtWidgets.QWidget):
         a0.accept()
 
     def keyPressEvent(self, a0: QKeyEvent) -> None:
+        print('hist: ------- key press event...')
         if a0.key() == QtCore.Qt.Key.Key_F:
             self.scene.fit()
             self.reset()
@@ -245,12 +240,6 @@ if __name__ == '__main__':
     histogram.set_number(241)
     histogram.set_spacetime(spacetime)
     histogram.set_time(24)
-    print('set_time...')
     histogram.show()
-    print('show...')
 
-    err = app.exec()
-    print('exec...')
-    print(f'Qt error = {err}')
-
-    sys.exit(err)
+    sys.exit(app.exec())
