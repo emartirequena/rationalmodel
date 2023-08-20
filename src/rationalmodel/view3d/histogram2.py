@@ -55,7 +55,7 @@ class Scene:
             if item.x > self.max_x: self.max_x = item.x
         if self.max_x != self.min_x:
             self.scl = self.width / (self.max_x - self.min_x)
-            self.ox = -self.min_x - 0.5
+            self.ox = -self.min_x
         else:
             self.scl = self.width / self.max_x
             self.ox = 0.
