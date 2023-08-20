@@ -13,7 +13,7 @@ from PyQt5.QtCore import Qt
 
 from spacetime import SpaceTime
 from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
-from utils import getDivisorsAndFactors, divisors
+from utils import getDivisorsAndFactors, divisors, make_video
 from config import Config
 from color import ColorLine
 from renderView import RenderView
@@ -230,7 +230,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar.show()
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
-    def makePath(self, period, number):
+    def _makePath(self, period, number):
         factors = self.get_output_factors(number)
         base_path  = os.path.join(self.config.get('image_path'), f'P{period:02d}')
         if not os.path.exists(base_path):
@@ -251,13 +251,15 @@ class MainWindow(QtWidgets.QMainWindow):
         period = self.period.value()
         factors = self.get_output_factors(number)
         
-        path = self.makePath(period, number)
+        path = self._makePath(period, number)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
+        frame_rate = self.config.get('frame_rate')
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
         video_format = self.config.get('video_format')
         video_codec = self.config.get('video_codec')
+        bit_rate = self.config.get('bit_rate')
 
         scene = rendering.Scene(options=None)
         view = RenderView(scene, projection=projection, navigation=navigation)
@@ -285,28 +287,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # if there are more tha one image, save video
         if init_time != end_time:
-            in_sequence = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
+            in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
             out_factors = self.get_output_factors(number)
             video_file_name = f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}'
-            out_video = os.path.join(path, video_file_name)
-            options = [
-                ffmpeg_path,
-                '-y',
-                '-r', '1',
-                '-i', in_sequence,
-                '-c', video_codec,
-                '-f', video_format,
-                '-s', f'{image_resx}x{image_resy}',
-                out_video,
-            ]
+            out_video_path = os.path.join(path, video_file_name)
+
             self.setStatus('Making video...')
-            subprocess.run(options)
+            make_video(
+                ffmpeg_path, in_sequence_path, out_video_path, 
+                video_codec, video_format, frame_rate, bit_rate, image_resx, image_resy
+            )
 
             self.setStatus('Copying video...')
             if not os.path.exists(video_path):
                 os.makedirs(video_path)
-            dest_video = os.path.join(video_path, video_file_name)
-            shutil.copyfile(out_video, dest_video)
+            dest_video_path = os.path.join(video_path, video_file_name)
+            shutil.copyfile(out_video_path, dest_video_path)
         
         self.rendering = False
         self.setStatus('Images saved...')
