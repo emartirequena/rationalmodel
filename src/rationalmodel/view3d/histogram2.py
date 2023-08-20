@@ -53,39 +53,52 @@ class Scene:
         for item in self.items:
             if item.x < self.min_x: self.min_x = item.x
             if item.x > self.max_x: self.max_x = item.x
-        self.scl = self.width / (self.max_x - self.min_x)
-        self.ox = -self.min_x - 0.5
+        if self.max_x != self.min_x:
+            self.scl = self.width / (self.max_x - self.min_x)
+            self.ox = -self.min_x - 0.5
+        else:
+            self.scl = self.width / self.max_x
+            self.ox = 0.
 
     def translate(self, dist: float):
         self.ox += dist / self.scl
 
+    @staticmethod
+    def _loga(a, x):
+        return np.log(x) / np.log(a)
+    
+    def _loga_round(self, a, x):
+        return int(np.power(a, int(self._loga(a, x))))
+    
+    def _get_y_step_max(self):
+        y_base = 10
+        y_step = int(self._loga(y_base, self.max_h))
+        y_step = y_step if y_step > 0 else 1
+        y_max = np.power(y_base, y_step)
+        return y_step, y_max
+
     def _render_grid(self, draw):
         colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
 
-        y_step = int(np.log10(self.max_h))
-        y_step = y_step if y_step > 0 else 1
-        y_max = np.power(10, y_step)
-        # print(f'hist: y_max: {y_max}, y_step {y_step}')
+        y_step, y_max = self._get_y_step_max()
         for y in range(0, y_max, y_step):
-
             color = colors[0]
-            if y == int(y_max * 0.5): color = colors[1]
-
-            h = np.power(y / y_max, 1.) * self.height 
+            if y == y_max // 2: color = colors[1]
+            h = np.power(y / y_max, 0.5) * self.height 
             draw.line((0, self.height - h, self.width, self.height - h), color, 1)
 
-        x_step = int(np.log10(self.max_x))
+        x_base = 10
+        x_step = self._loga_round(x_base, x_base * 10 / self.scl)
         x_step = x_step if x_step > 0 else 1
-        x_max = int(np.power(10, x_step)) * 20
-        print(f'hist: x_max: {x_max}, x_step {x_step}')
+        x_max = x_step * np.power(x_base, 3)
         for x in range(-x_max, x_max, x_step):
 
             color = colors[0]
             if x == 0: color = colors[3]
-            elif x % x_step == 5: color = colors[1]
-            elif x % x_step == 0: color = colors[2]
+            elif (x - x_max) % x_base == 0: color = colors[1]
+            elif (x - x_max) % x_base == 5: color = colors[2]
 
-            px = int(x * self.scl + self.ox)
+            px = int((x + self.ox) * self.scl)
             w = 1 if np.abs(px) > 0.1 else 3
             draw.line((px, self.height, px, 0), color, w)
 
@@ -94,12 +107,10 @@ class Scene:
         draw = ImageDraw.Draw(img)
 
         self._render_grid(draw)
-        y_step = int(np.log10(self.max_h))
-        y_step = y_step if y_step > 0 else 1
-        y_max = np.power(10, y_step)
+        _, y_max = self._get_y_step_max()
         for item in self.items:
             x = int((item.x + self.ox) * self.scl)
-            h = np.power(item.height / y_max, 1.) * self.height
+            h = np.power(item.height / y_max, 0.5) * self.height
             draw.line((x, self.height - h, x, self.height), (item.color), 3)
 
         draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
@@ -272,15 +283,15 @@ if __name__ == '__main__':
     from spacetime import SpaceTime
 
     spacetime = SpaceTime(T=10, max=30, dim=3)
-    spacetime.setRationalSet(n=32769)
+    spacetime.setRationalSet(n=11)
     spacetime.addRationalSet()
 
     app = QtWidgets.QApplication(sys.argv)
 
     histogram = Histogram()
-    histogram.set_number(32769)
+    histogram.set_number(11)
     histogram.set_spacetime(spacetime)
-    histogram.set_time(25)
+    histogram.set_time(30)
     histogram.show()
 
     sys.exit(app.exec())
