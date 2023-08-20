@@ -6,10 +6,7 @@ import numpy as np
 
 from config import Config
 from color import ColorLine
-
-
-def lerp(t, ta, a, tb, b):
-    return a + (b-a)*(t-ta)/(tb-ta)
+from utils import lerp
 
 
 class Item:
@@ -22,47 +19,90 @@ class Item:
             int(255 * color.z)
         )
 
+
 class Scene:
     def __init__(self, width: int, height: int) -> None:
         self.width: int = width
         self.height: int = height
+        self.min_x = 0.
+        self.max_x = 0.
+        self.max_h = 0.
         self.ox: float = width / 2
-        self.scl: float = 1
+        self.scl: float = 1.
         self.items: list[Item] = []
 
     def clear(self):
         self.items = []
+        self.max_x = 0.
+        self.max_h = 0.
 
     def add(self, x: int, height: int, color: vec3):
         self.items.append(Item(x, height, color))
+        if x > self.max_x: self.max_x = x
+        if height > self.max_h: self.max_h = height
 
     def scale(self, x: float, step: float):
+        sox = self.ox * self.scl
         factor = 1.05 if step > 0. else 1./1.05
         self.scl *= factor
-        self.ox -= (x - (self.max - self.min) * self.scl) / self.width
+        self.ox = ((sox - x) * factor + x) / self.scl
 
     def fit(self):
-        self.min =  1000000
-        self.max = -1000000
+        self.min_x =  10000000000
+        self.max_x = -10000000000
         for item in self.items:
-            if item.x < self.min:
-                self.min = item.x
-            if item.x > self.max:
-                self.max = item.x
-        self.scl = self.width / (self.max - self.min)
-        self.ox = -self.min * self.scl
+            if item.x < self.min_x: self.min_x = item.x
+            if item.x > self.max_x: self.max_x = item.x
+        self.scl = self.width / (self.max_x - self.min_x)
+        self.ox = -self.min_x - 0.5
 
     def translate(self, dist: float):
-        self.ox += dist
+        self.ox += dist / self.scl
+
+    def _render_grid(self, draw):
+        colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
+
+        y_step = int(np.log10(self.max_h))
+        y_step = y_step if y_step > 0 else 1
+        y_max = np.power(10, y_step)
+        # print(f'hist: y_max: {y_max}, y_step {y_step}')
+        for y in range(0, y_max, y_step):
+
+            color = colors[0]
+            if y == int(y_max * 0.5): color = colors[1]
+
+            h = np.power(y / y_max, 1.) * self.height 
+            draw.line((0, self.height - h, self.width, self.height - h), color, 1)
+
+        x_step = int(np.log10(self.max_x))
+        x_step = x_step if x_step > 0 else 1
+        x_max = int(np.power(10, x_step)) * 20
+        print(f'hist: x_max: {x_max}, x_step {x_step}')
+        for x in range(-x_max, x_max, x_step):
+
+            color = colors[0]
+            if x == 0: color = colors[3]
+            elif x % x_step == 5: color = colors[1]
+            elif x % x_step == 0: color = colors[2]
+
+            px = int(x * self.scl + self.ox)
+            w = 1 if np.abs(px) > 0.1 else 3
+            draw.line((px, self.height, px, 0), color, w)
 
     def render(self):
         img = Image.new('RGB', (self.width, self.height), (0, 0, 0))
         draw = ImageDraw.Draw(img)
-        draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
+
+        self._render_grid(draw)
+        y_step = int(np.log10(self.max_h))
+        y_step = y_step if y_step > 0 else 1
+        y_max = np.power(10, y_step)
         for item in self.items:
-            x = int(item.x * self.scl + self.ox)
-            height = np.power(item.height, 0.5) * self.height 
-            draw.line((x, self.height - height, x, self.height), (item.color), 3)
+            x = int((item.x + self.ox) * self.scl)
+            h = np.power(item.height / y_max, 1.) * self.height
+            draw.line((x, self.height - h, x, self.height), (item.color), 3)
+
+        draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
         return img
 
     @staticmethod
@@ -117,9 +157,9 @@ class Histogram(QtWidgets.QWidget):
 
         self.scene = Scene(self.width(), self.height())
         self.scene.clear()
-        img = self.scene.render()
+        # img = self.scene.render()
         self.label = QtWidgets.QLabel(self)
-        self.label.setPixmap(self.scene._pil2pixmap(img))
+        # self.label.setPixmap(self.scene._pil2pixmap(img))
         self.layout.addWidget(self.label)
         
         self.old_pos = 0.
@@ -173,7 +213,8 @@ class Histogram(QtWidgets.QWidget):
             alpha = float(num) / float(max)
             pos = float(num)
             color = self.color.getColor(alpha)
-            height = float(dict_objs[num]) / float(count)
+            # height = float(dict_objs[num]) / float(count)
+            height = float(dict_objs[num])
             self.scene.add(pos, height, color)
 
     def prepare_save(self, ctx=None):
@@ -230,16 +271,16 @@ if __name__ == '__main__':
     import sys
     from spacetime import SpaceTime
 
-    spacetime = SpaceTime(T=8, max=24, dim=3)
-    spacetime.setRationalSet(n=241)
+    spacetime = SpaceTime(T=10, max=30, dim=3)
+    spacetime.setRationalSet(n=32769)
     spacetime.addRationalSet()
 
     app = QtWidgets.QApplication(sys.argv)
 
     histogram = Histogram()
-    histogram.set_number(241)
+    histogram.set_number(32769)
     histogram.set_spacetime(spacetime)
-    histogram.set_time(24)
+    histogram.set_time(25)
     histogram.show()
 
     sys.exit(app.exec())

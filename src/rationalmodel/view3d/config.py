@@ -14,6 +14,8 @@ class Config:
             'image_resy': 1080,
             'video_codec': 'prores',
             'video_format': 'mov',
+            'frame_rate': 1,
+            'bit_rate': 4000,
             'colors': [
                 {'alpha': 0.0, 'color': [0.2, 0.2, 1.0]},
                 {'alpha': 0.5, 'color': [0.3, 0.6, 0.5]},

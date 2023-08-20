@@ -1,5 +1,37 @@
 from functools import reduce
 from copy import copy
+import subprocess
+
+
+def lerp(t, ta, a, tb, b):
+    return a + (b-a)*(t-ta)/(tb-ta)
+
+
+def make_video(
+        ffmpeg_path: str, 
+        in_sequence_path: str, 
+        out_video_path: str, 
+        video_codec: str='prores', 
+        video_format: str='mov', 
+        frame_rate: int=1, 
+        bit_rate: int=4000, 
+        image_resx: int=1920, 
+        image_resy: int=1080
+):
+    options = [
+        ffmpeg_path,
+        '-y',
+        '-r', f'{frame_rate}',
+        '-c', video_codec,
+        '-f', video_format,
+        '-b:v', f'{bit_rate}',
+        '-s', f'{image_resx}x{image_resy}',
+        '-i', in_sequence_path,
+        out_video_path,
+    ]
+    print(*options)
+    subprocess.run(options)
+
 
 def appendEs2Sequences(sequences, es):
     result=[]
