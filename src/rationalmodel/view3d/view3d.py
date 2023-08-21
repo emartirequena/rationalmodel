@@ -254,6 +254,8 @@ class MainWindow(QtWidgets.QMainWindow):
         path = self._makePath(period, number)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
+        histogram_resx = self.config.get('histogram_resx')
+        histogram_resy = self.config.get('histogram_resy')
         frame_rate = self.config.get('frame_rate')
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
@@ -287,10 +289,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # if there are more tha one image, save video
         if init_time != end_time:
-            out_factors = self.get_output_factors(number)
-
             in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
-            out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}')
+            out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
             self.setStatus('Making video...')
             make_video(
                 ffmpeg_path, 
@@ -301,20 +301,20 @@ class MainWindow(QtWidgets.QMainWindow):
             )
 
             in_sequence_path = os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.%04d.png')
-            out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{out_factors}.{video_format}')
-            self.setStatus('Making video...')
+            out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+            self.setStatus('Making histogram video...')
             make_video(
                 ffmpeg_path, 
                 in_sequence_path, out_video_path, 
                 video_codec, video_format, 
                 frame_rate, bit_rate, 
-                image_resx, image_resy
+                histogram_resx, histogram_resy
             )
 
             self.setStatus('Copying video...')
             if not os.path.exists(video_path):
                 os.makedirs(video_path)
-            dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}')
+            dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
             shutil.copyfile(out_video_path, dest_video_path)
         
         self.rendering = False
