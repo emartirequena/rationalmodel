@@ -287,21 +287,34 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # if there are more tha one image, save video
         if init_time != end_time:
-            in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
             out_factors = self.get_output_factors(number)
-            video_file_name = f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}'
-            out_video_path = os.path.join(path, video_file_name)
 
+            in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
+            out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}')
             self.setStatus('Making video...')
             make_video(
-                ffmpeg_path, in_sequence_path, out_video_path, 
-                video_codec, video_format, frame_rate, bit_rate, image_resx, image_resy
+                ffmpeg_path, 
+                in_sequence_path, out_video_path, 
+                video_codec, video_format, 
+                frame_rate, bit_rate, 
+                image_resx, image_resy
+            )
+
+            in_sequence_path = os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.%04d.png')
+            out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{out_factors}.{video_format}')
+            self.setStatus('Making video...')
+            make_video(
+                ffmpeg_path, 
+                in_sequence_path, out_video_path, 
+                video_codec, video_format, 
+                frame_rate, bit_rate, 
+                image_resx, image_resy
             )
 
             self.setStatus('Copying video...')
             if not os.path.exists(video_path):
                 os.makedirs(video_path)
-            dest_video_path = os.path.join(video_path, video_file_name)
+            dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{out_factors}.{video_format}')
             shutil.copyfile(out_video_path, dest_video_path)
         
         self.rendering = False

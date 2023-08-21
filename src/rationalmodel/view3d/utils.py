@@ -22,11 +22,11 @@ def make_video(
         ffmpeg_path,
         '-y',
         '-r', f'{frame_rate}',
+        '-i', in_sequence_path,
         '-c', video_codec,
         '-f', video_format,
         '-b:v', f'{bit_rate}',
         '-s', f'{image_resx}x{image_resy}',
-        '-i', in_sequence_path,
         out_video_path,
     ]
     print(*options)
