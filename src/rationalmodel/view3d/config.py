@@ -29,6 +29,7 @@ class Config:
             'histogram_resx': 200,
             'histogram_resy': 50,
             'histogram_max': 10000,
+            'histogram_y_factor': 0.5,
             'objects_key': 1
         }
         if os.path.exists(config_file):

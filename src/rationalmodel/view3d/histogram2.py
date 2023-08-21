@@ -21,25 +21,25 @@ class Item:
 
 
 class Scene:
-    def __init__(self, width: int, height: int) -> None:
+    def __init__(self, width: int, height: int, y_factor: float=1.) -> None:
         self.width: int = width
         self.height: int = height
         self.min_x = 0.
         self.max_x = 0.
         self.max_h = 0.
+        self.y_factor = y_factor
         self.ox: float = width / 2
         self.scl: float = 1.
         self.items: list[Item] = []
 
-    def clear(self):
+    def clear(self, max_h=1.):
         self.items = []
         self.max_x = 0.
-        self.max_h = 0.
+        self.max_h = max_h
 
     def add(self, x: int, height: int, color: vec3):
         self.items.append(Item(x, height, color))
         if x > self.max_x: self.max_x = x
-        if height > self.max_h: self.max_h = height
 
     def scale(self, x: float, step: float):
         sox = self.ox * self.scl
@@ -70,35 +70,44 @@ class Scene:
     def _loga_round(self, a, x):
         return int(np.power(a, int(self._loga(a, x))))
     
-    def _get_y_step_max(self):
-        y_base = 10
-        y_step = int(self._loga(y_base, self.max_h))
+    def _get_y_step_max(self, y_base):
+        y_step = int(self._loga_round(y_base, self.max_h))
         y_step = y_step if y_step > 0 else 1
-        y_max = np.power(y_base, y_step)
+        y_max = y_step * np.power(y_base, 2)
         return y_step, y_max
-
-    def _render_grid(self, draw):
-        colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
-
-        y_step, y_max = self._get_y_step_max()
-        for y in range(0, y_max, y_step):
-            color = colors[0]
-            if y == y_max // 2: color = colors[1]
-            h = np.power(y / y_max, 0.5) * self.height 
-            draw.line((0, self.height - h, self.width, self.height - h), color, 1)
-
-        x_base = 10
+    
+    def _get_x_step_max(self, x_base):
         x_step = self._loga_round(x_base, x_base * 10 / self.scl)
         x_step = x_step if x_step > 0 else 1
         x_max = x_step * np.power(x_base, 3)
+        return x_step, x_max
+
+    def _render_grid(self, draw):
+        colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (0, 100, 200), (255, 255, 0)]
+        x_base = 10
+        y_base = 10
+
+        y_step, y_max = self._get_y_step_max(y_base)
+        for y in range(y_step, y_max, y_step):
+            color = colors[0]
+            if   y % (10 * y_step) == 0: color = colors[1]
+            elif y % ( 5 * y_step) == 0: color = colors[2]
+            if self._loga(y_base, y) >= 1 and color == colors[0]:
+                continue
+            h = np.power(y / y_max, self.y_factor) * self.height
+            draw.line((0, self.height - h, self.width, self.height - h), color, 1)
+
+        x_step, x_max = self._get_x_step_max(x_base)
         for x in range(-x_max, x_max, x_step):
 
             color = colors[0]
-            if x == 0: color = colors[3]
-            elif (x - x_max) % x_base == 0: color = colors[1]
-            elif (x - x_max) % x_base == 5: color = colors[2]
+            if x == 0: color = colors[4]
+            else:
+                if abs(x_max - x) % (10 * x_step) == 0: color = colors[2]
+                if abs(x_max - x) % ( 5 * x_step) == 0: color = colors[1]
 
             px = int((x + self.ox) * self.scl)
+            if px < 0 or px > self.width: continue
             w = 1 if np.abs(px) > 0.1 else 3
             draw.line((px, self.height, px, 0), color, w)
 
@@ -107,10 +116,10 @@ class Scene:
         draw = ImageDraw.Draw(img)
 
         self._render_grid(draw)
-        _, y_max = self._get_y_step_max()
+        _, y_max = self._get_y_step_max(10)
         for item in self.items:
             x = int((item.x + self.ox) * self.scl)
-            h = np.power(item.height / y_max, 0.5) * self.height
+            h = np.power(item.height / y_max, self.y_factor) * self.height
             draw.line((x, self.height - h, x, self.height), (item.color), 3)
 
         draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
@@ -146,6 +155,7 @@ class Histogram(QtWidgets.QWidget):
         self.resy = self.config.get('histogram_resy')
         self.hist_size = (self.resx, self.resy)
         self.hist_max = self.config.get('histogram_max')
+        self.hist_y_factor = self.config.get('histogram_y_factor')
         self.color = ColorLine()
         for knot in self.config.get('colors'):
             self.color.add(knot['alpha'], vec3(*knot['color']))
@@ -166,17 +176,16 @@ class Histogram(QtWidgets.QWidget):
         self.setPalette(palette)
         self.setAutoFillBackground(True)
 
-        self.scene = Scene(self.width(), self.height())
+        self.scene = Scene(self.width(), self.height(), self.hist_y_factor)
         self.scene.clear()
-        # img = self.scene.render()
         self.label = QtWidgets.QLabel(self)
-        # self.label.setPixmap(self.scene._pil2pixmap(img))
         self.layout.addWidget(self.label)
         
         self.old_pos = 0.
 
     def set_number(self, number):
         self.hist_max = int(number)
+        self.scene.clear(number)
 
     def set_spacetime(self, spacetime):
         if self.spacetime is not spacetime:
@@ -271,7 +280,7 @@ class Histogram(QtWidgets.QWidget):
                 self.set_time(self.time - 1)
                 a0.accept()
                 return
-            elif a0.key() == QtCore.Qt.Key.Key_Right and self.time < 24:
+            elif a0.key() == QtCore.Qt.Key.Key_Right and self.time < 30:
                 self.set_time(self.time + 1)
                 a0.accept()
                 return
@@ -282,16 +291,21 @@ if __name__ == '__main__':
     import sys
     from spacetime import SpaceTime
 
-    spacetime = SpaceTime(T=10, max=30, dim=3)
-    spacetime.setRationalSet(n=11)
+    n = 32769
+    T = 10
+    max = 30
+    dim = 3
+
+    spacetime = SpaceTime(T=T, max=max, dim=dim)
+    spacetime.setRationalSet(n)
     spacetime.addRationalSet()
 
     app = QtWidgets.QApplication(sys.argv)
 
     histogram = Histogram()
-    histogram.set_number(11)
+    histogram.set_number(n)
     histogram.set_spacetime(spacetime)
-    histogram.set_time(30)
+    histogram.set_time(max)
     histogram.show()
 
     sys.exit(app.exec())
