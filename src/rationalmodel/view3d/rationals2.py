@@ -1,4 +1,5 @@
 import numpy as np
+import atexit
 
 c = 0.5
 
@@ -16,6 +17,10 @@ class Rational():
         self.positions = [self.getPosition(t) for t in range(self.period + 1)]
         del self.digits
         del self.reminders
+        atexit.register(self.cleanup)
+
+    def cleanup(self):
+        del self.positions
 
     def getSequence(self):
         base = int(2**self.dim)
