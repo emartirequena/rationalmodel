@@ -22,5 +22,5 @@
     "histogram_resx": 700,
     "histogram_resy": 100,
     "histogram_max": 10000,
-    "histogram_y_factor": 0.5
+    "histogram_y_factor": 0.75
 }

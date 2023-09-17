@@ -1,13 +1,13 @@
 import os
 import math
 import shutil
-import subprocess
 import sys
 from copy import deepcopy
 import gc
+import objgraph
+from multiprocessing import freeze_support
 
-import moderngl as mgl
-from madcad import vec3, fmat4, rendering, settings, uvsphere, Axis, X, Y, Z, Box
+from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
@@ -65,13 +65,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.num = 0
         self.numbers = {}
         self.config = Config()
+        self.color = None
+        self.loadConfigColors()
+        self.make_view(0)
+        self.showMaximized()
+
+    def loadConfigColors(self):
         self.color = ColorLine()
         colors = self.config.get('colors')
         if colors:
             for knot in colors:
                 self.color.add(knot['alpha'], vec3(*knot['color']))
-        self.make_view(0)
-        self.showMaximized()
         
     def setUpUi(self):
         self.resize(1920, 1080)
@@ -327,10 +331,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._saveImages(0, self.maxTime.value())
 
     def compute(self):
+        if self.spacetime is not None:
+            print('------- del spacetime...')
+            if self.histogram is not None:
+                self.histogram.set_spacetime(None)
+            del self.spacetime
+            self.spacetime = None
+            gc.collect(2)
 
-        if self.number.value() == 0:
-            return
-        
         self.setStatus('Creating incremental spacetime...')
         self.rendering = True
 
@@ -344,6 +352,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setStatus('Adding rational set...')
         self.spacetime.addRationalSet()
+        self.setStatus(f'Rational set added for number {int(self.number.value())}')
         self.timeWidget.setValue(self.maxTime.value())
         self.timeWidget.setFocus()
 
@@ -354,15 +363,17 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if not self.spacetime:
             return
+        if self.number.value() == 0:
+            return
         if make_view:
             time = self.timeWidget.value()
-        if time >= len(self.spacetime.spaces):
+        if time > self.spacetime.len():
             return
-        space = self.spacetime.spaces[time]
+        space = self.spacetime.getSpace(time)
 
         list_objs = []
 
-        self.setStatus(f'Drawing frame: {time} ...')
+        self.setStatus(f'Drawing time: {time} ...')
 
         self.num = 0
         max = -1
@@ -372,10 +383,10 @@ class MainWindow(QtWidgets.QMainWindow):
             num = cell['count']
             if num > max:
                 max = num
-            if cell['count']:
+            if num > 0:
                 self.count += 1
-                self.num += cell['count']
-        self.setStatus(f'Num spheres: {self.count}, time: {time}')
+            self.num += num
+        self.setStatus(f'Creating {self.count} spheres at time: {time}')
 
         rad_factor = self.config.get('rad_factor')
         rad_pow = self.config.get('rad_pow')
@@ -383,19 +394,17 @@ class MainWindow(QtWidgets.QMainWindow):
         max_faces = self.config.get('max_faces')
         faces_pow = self.config.get('faces_pow')
 
-        for i in range(len(space.cells)):
-            cell = space.cells[i].get()
-            num = cell['count']
-            if num == 0:
-                continue
-            x, y, z = cell['pos']
-            alpha = float(num) / float(max)
+        view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
+
+        for cell in view_cells:
+            alpha = float(cell.count) / float(max)
             rad = math.pow(alpha / rad_factor, rad_pow)
-            if rad < rad_min: 
+            if rad < rad_min:
                 rad = rad_min
-            sphere = uvsphere(vec3(x, y, z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
+            sphere = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             sphere.option(color=self.color.getColor(alpha))
             list_objs.append(sphere)
+        del view_cells
 
         axisX = Axis(vec3(0), X)
         axisY = Axis(vec3(0), Y)
@@ -412,7 +421,8 @@ class MainWindow(QtWidgets.QMainWindow):
         for i in range(len(list_objs)):
             self.objs[self.config.getKey()] = list_objs[i]
 
-        print(f"key: {self.config.values['objects_key']}")
+        del list_objs
+        gc.collect(2)
 
         if make_view:
             self.make_view(time)
@@ -460,7 +470,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objs = {}
         gc.collect()
         self.rendering = False
-        self.setStatus(f'{self.count} objects created at frame {self.timeWidget.value()}...')
+        self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()}...')
         
     def fit_histogram(self):
         if not self.histogram:
@@ -501,6 +511,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_period_factors(self, T):
         self.setStatus('Computing divisors...')
+        self.spacetime = None
         self.fillDivisors(T)
         label = self.get_factors(list(self.numbers.keys())[-1])
         self.factorsLabel.setText(label)
@@ -544,6 +555,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
+    freeze_support()
     settings.load(settings_file)
     app = QtWidgets.QApplication(sys.argv)
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)

@@ -85,7 +85,7 @@ class Scene:
     def _render_grid(self, draw):
         colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (0, 100, 200), (255, 255, 0)]
         x_base = 10
-        y_base = 10
+        y_base = 5
 
         y_step, y_max = self._get_y_step_max(y_base)
         for y in range(y_step, y_max, y_step):
@@ -209,7 +209,7 @@ class Histogram(QtWidgets.QWidget):
         self.reset()
 
     def _make_items(self):
-        space = self.spacetime.spaces[self.time]
+        space = self.spacetime.spaces.spaces[self.time]
 
         dict_objs = {}
 
