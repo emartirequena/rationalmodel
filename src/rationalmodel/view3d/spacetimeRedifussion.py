@@ -1,4 +1,4 @@
-from rationals2 import Rational, c
+from rationals import Rational, c
 import random
 
 

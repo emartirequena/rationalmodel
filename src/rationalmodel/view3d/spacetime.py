@@ -1,8 +1,7 @@
 from multiprocessing import Pool, cpu_count, Pipe
 import gc
-import atexit
 
-from rationals2 import Rational, c
+from rationals import Rational, c
 
 
 spacetime = None

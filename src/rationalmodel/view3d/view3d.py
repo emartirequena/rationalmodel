@@ -17,7 +17,7 @@ from utils import getDivisorsAndFactors, divisors, make_video
 from config import Config
 from color import ColorLine
 from renderView import RenderView
-from histogram2 import Histogram
+from histogram import Histogram
 
 settings_file = r'settings.txt'
 
@@ -209,12 +209,32 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionRight.triggered.connect(self.incrementTime)
         self.menuTime.addAction(self.actionRight)
 
+        self.actionInit = QtWidgets.QAction('Set init time', self.centralWidget())
+        self.actionInit.setShortcut('Home')
+        self.actionInit.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        self.actionInit.triggered.connect(self.setTimeInit)
+        self.menuTime.addAction(self.actionInit)
+
+        self.actionEnd = QtWidgets.QAction('Set end time', self.centralWidget())
+        self.actionEnd.setShortcut('End')
+        self.actionEnd.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        self.actionEnd.triggered.connect(self.setTimeEnd)
+        self.menuTime.addAction(self.actionEnd)
+
         self.menu.addMenu(self.menuTime)
 
         self.statusBar = QtWidgets.QStatusBar(self)
         self.statusLabel = QtWidgets.QLabel()
         self.statusBar.addWidget(self.statusLabel)
         self.setStatusBar(self.statusBar)
+
+    def setTimeInit(self):
+        print('------- set 0 time')
+        self.timeWidget.setValue(0)
+
+    def setTimeEnd(self):
+        print('------- set max time')
+        self.timeWidget.setValue(self.maxTime.value())
 
     def decrementTime(self):
         print('------- decrement time...')
