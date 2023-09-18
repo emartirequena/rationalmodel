@@ -311,11 +311,11 @@ class MainWindow(QtWidgets.QMainWindow):
             objs = self.make_objects(time=time, make_view=False)
             scene.add(objs)
             img = view.render()
-            img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             if self.view_histogram:
                 hist_img = self.histogram.save_image(time)
                 img.alpha_composite(hist_img)
                 hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
             gc.collect()
