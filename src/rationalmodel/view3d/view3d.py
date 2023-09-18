@@ -4,7 +4,6 @@ import shutil
 import sys
 from copy import deepcopy
 import gc
-import objgraph
 from multiprocessing import freeze_support
 
 from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
@@ -12,7 +11,6 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from spacetime import SpaceTime
-from spacetimeRedifussion import SpaceTime as SpaceTimeRedifussion
 from utils import getDivisorsAndFactors, divisors, make_video
 from config import Config
 from color import ColorLine
@@ -35,10 +33,7 @@ class MainView(rendering.View):
             center = self.scene.item(obj).box.center
             t = self.mainWindow.timeWidget.value()
             spacetime = self.mainWindow.spacetime
-            if not bool(self.mainWindow.accumulate.checkState()):
-                cell = spacetime.getCell(t, center.x, center.y, center.z)
-            else:
-                cell = spacetime.getTotalsCell(t, center.x, center.y, center.z)
+            cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=bool(self.mainWindow.accumulate.checkState()))
             max = self.mainWindow.num or 1
             percent = 100.0 * float(cell.count) / float(max)
             text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
@@ -61,8 +56,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.count = 0
         self.objs = {}
         self.view = None
+        self.period_changed = False
         self.histogram = None
-        self.rendering = False
+        self.view_histogram = True
         self.spacetime = None
         self.factors = ''
         self.num = 0
@@ -183,19 +179,35 @@ class MainWindow(QtWidgets.QMainWindow):
         self.menu.addMenu(self.mainMenu)
 
         self.menuUtils = QtWidgets.QMenu('Utils')
+
         self.actionSaveImage = QtWidgets.QAction('Save Image', self)
         self.actionSaveImage.setShortcut('I')
         self.actionSaveImage.triggered.connect(self.saveImage)
         self.menuUtils.addAction(self.actionSaveImage)
+
         self.actionSaveVideo = QtWidgets.QAction('Save Video', self)
         self.actionSaveVideo.setShortcut('V')
         self.actionSaveVideo.triggered.connect(self.saveVideo)
         self.menuUtils.addAction(self.actionSaveVideo)
+
         self.menuUtils.addSeparator()
+
         self.actionFitHistogram = QtWidgets.QAction('Fit Histogram', self)
         self.actionFitHistogram.setShortcut('F')
         self.actionFitHistogram.triggered.connect(self.fit_histogram)
         self.menuUtils.addAction(self.actionFitHistogram)
+
+        self.actionViewHistogram = QtWidgets.QAction('View Histogram', self)
+        self.actionViewHistogram.setShortcut('H')
+        self.actionViewHistogram.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        self.actionViewHistogram.triggered.connect(self.set_view_histogram)
+        self.menuUtils.addAction(self.actionViewHistogram)
+
+        self.actionCenterView = QtWidgets.QAction('Center View', self)
+        self.actionCenterView.setShortcut('C')
+        self.actionCenterView.triggered.connect(self.center_view)
+        self.menuUtils.addAction(self.actionCenterView)
+        
         self.menu.addMenu(self.menuUtils)
 
         self.menuTime = QtWidgets.QMenu('Time')
@@ -269,7 +281,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _saveImages(self, init_time, end_time):
         self.setStatus('Saving images...')
-        self.rendering = True
         
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
@@ -300,10 +311,11 @@ class MainWindow(QtWidgets.QMainWindow):
             objs = self.make_objects(time=time, make_view=False)
             scene.add(objs)
             img = view.render()
-            hist_img = self.histogram.save_image(time)
-            img.alpha_composite(hist_img)
             img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-            hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            if self.view_histogram:
+                hist_img = self.histogram.save_image(time)
+                img.alpha_composite(hist_img)
+                hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
             gc.collect()
@@ -344,7 +356,6 @@ class MainWindow(QtWidgets.QMainWindow):
             dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
             shutil.copyfile(out_video_path, dest_video_path)
         
-        self.rendering = False
         self.setStatus('Images saved...')
 
     def saveImage(self):
@@ -374,14 +385,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.spacetime.addRationalSet()
         self.setStatus(f'Rational set added for number {int(self.number.value())}')
         
-        self.timeWidget.setValue(self.maxTime.value())
+        self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
-        self.make_objects(time=self.maxTime.value())
+        self.make_objects()
+        self.period_changed = False
         
     def make_objects(self, time:int=0, make_view:bool=True):
-        self.rendering = True
-
         if not self.spacetime:
             return
         if self.number.value() == 0:
@@ -391,10 +401,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if time > self.spacetime.len():
             return
         
-        if not bool(self.accumulate.checkState()):
-            space = self.spacetime.getSpace(time)
-        else:
-            space = self.spacetime.getTotals(time)
+        space = self.spacetime.getSpace(time, accumulate=bool(self.accumulate.checkState()))
 
         list_objs = []
 
@@ -460,7 +467,6 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.objs
 
     def make_view(self, time):
-
         if not self.view:
             print("view doesn't exists...")
             scene = rendering.Scene(self.objs, options=None)
@@ -480,8 +486,9 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, accumulate=bool(self.accumulate.checkState()))
-            self.histogram.show()
+            self.histogram.set_time(time, bool(self.accumulate.checkState()))
+            if self.view_histogram:
+                self.histogram.show()
 
         else:
             print('continue setting number...')
@@ -493,21 +500,38 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, accumulate=bool(self.accumulate.checkState()))
-            self.histogram.show()
+            self.histogram.set_time(time, bool(self.accumulate.checkState()))
+            if self.view_histogram:
+                self.histogram.show()
 
         del self.objs
         self.objs = {}
         gc.collect()
-        self.rendering = False
-        self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()}...')
+        self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
         
     def fit_histogram(self):
-        if not self.histogram:
+        if not self.histogram or not self.view_histogram:
             return
         self.histogram.scene.fit()
         self.histogram.reset()
         self.histogram.update()
+
+    def set_view_histogram(self):
+        self.view_histogram = not self.view_histogram
+        if not self.histogram:
+            return
+        if not self.view_histogram:
+            self.histogram.hide()
+        else:
+            self.histogram.show()
+            self.histogram.update()
+
+    def center_view(self):
+        if not self.view:
+            return
+        self.view.center()
+        self.view.adjust()
+        self.view.update()
 
     def get_factors(self, number):
         factors = self.numbers[number]['factors']
@@ -539,8 +563,10 @@ class MainWindow(QtWidgets.QMainWindow):
         label = '_'.join(labels)
         return label
 
-    def get_period_factors(self, T):
+    def get_period_factors(self):
         self.setStatus('Computing divisors...')
+        self.period_changed = True
+        T = int(self.period.value())
         self.spacetime = None
         self.fillDivisors(T)
         label = self.get_factors(list(self.numbers.keys())[-1])
@@ -557,7 +583,8 @@ class MainWindow(QtWidgets.QMainWindow):
         is_even: bool = True if T % 2 == 0 else False
         specials = []
         if is_even:
-            specials = divisors(a**(T // 2) + 1)
+            d = int(T // 2)
+            specials = divisors(a**d + 1)
         else:
             specials = [c**b - 1]
         for record in self.numbers.values():
