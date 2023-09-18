@@ -75,18 +75,38 @@ class Spaces:
 		self.max = max
 		self.dim = dim
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
+		self.totals_even = Space(max if T%2 == 0 else max-1, dim)
+		self.totals_odd = Space(max if T%2 == 1 else max-1, dim)
 
 	def __del__(self):
 		del self.spaces
+		del self.totals_even
+		del self.totals_odd
 
 	def add(self, t, x, y=0, z=0):
 		self.spaces[t].add(x, y, z)
+		if t%2 == 0:
+			self.totals_even.add(x, y, z)
+		else:
+			self.totals_odd.add(x, y, z)
 
 	def getCell(self, t, x, y=0, z=0):
 		return self.spaces[t].getCell(x, y, z)
 	
+	def getTotalsCell(self, t, x, y=0, z=0):
+		if t%2 == 0:
+			return self.totals_even.getCell(x, y, z)
+		else:
+			return self.totals_odd.getCell(x, y, z)
+	
 	def getSpace(self, t):
 		return self.spaces[t]
+	
+	def getTotals(self, t):
+		if t%2 == 0:
+			return self.totals_even
+		else:
+			return self.totals_odd
 
 
 def create_rational(args):
@@ -130,8 +150,14 @@ class SpaceTime(object):
 	def getCell(self, t, x, y=0, z=0):
 		return self.spaces.getCell(t, x, y, z)
 	
+	def getTotalsCell(self, t, x, y=0, z=0):
+		return self.spaces.getTotalsCell(t, x, y, z)
+	
 	def getSpace(self, t):
 		return self.spaces.getSpace(t)
+	
+	def getTotals(self, t):
+		return self.spaces.getTotals(t)
 
 	def setRationalSet(self, n: int):
 		p = Pool(cpu_count())
