@@ -35,7 +35,10 @@ class MainView(rendering.View):
             center = self.scene.item(obj).box.center
             t = self.mainWindow.timeWidget.value()
             spacetime = self.mainWindow.spacetime
-            cell = spacetime.getCell(t, center.x, center.y, center.z)
+            if not bool(self.mainWindow.accumulate.checkState()):
+                cell = spacetime.getCell(t, center.x, center.y, center.z)
+            else:
+                cell = spacetime.getTotalsCell(t, center.x, center.y, center.z)
             max = self.mainWindow.num or 1
             percent = 100.0 * float(cell.count) / float(max)
             text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
@@ -159,9 +162,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.divisors.clicked.connect(self.setNumber)
         self.rightLayout.addWidget(self.divisors)
 
-        self.redifussion = QtWidgets.QCheckBox('Redifussion', self)
-        self.redifussion.setCheckState(Qt.Unchecked)
-        self.rightLayout.addWidget(self.redifussion)
+        self.accumulate = QtWidgets.QCheckBox('Accumulate', self)
+        self.accumulate.setCheckState(Qt.Unchecked)
+        self.rightLayout.addWidget(self.accumulate)
 
         self.computeButton = QtWidgets.QPushButton('Compute', self)
         self.rightLayout.addWidget(self.computeButton)
@@ -362,10 +365,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus('Creating incremental spacetime...')
         self.rendering = True
 
-        if self.redifussion.isChecked():
-            self.spacetime = SpaceTimeRedifussion(self.period.value(), self.maxTime.value(), dim=3)
-        else:
-            self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
+        self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
 
         self.setStatus(f'Setting rational set for number: {int(self.number.value())} ...')
         self.spacetime.setRationalSet(int(self.number.value()))
@@ -373,6 +373,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus('Adding rational set...')
         self.spacetime.addRationalSet()
         self.setStatus(f'Rational set added for number {int(self.number.value())}')
+        
         self.timeWidget.setValue(self.maxTime.value())
         self.timeWidget.setFocus()
 
@@ -389,7 +390,11 @@ class MainWindow(QtWidgets.QMainWindow):
             time = self.timeWidget.value()
         if time > self.spacetime.len():
             return
-        space = self.spacetime.getSpace(time)
+        
+        if not bool(self.accumulate.checkState()):
+            space = self.spacetime.getSpace(time)
+        else:
+            space = self.spacetime.getTotals(time)
 
         list_objs = []
 
@@ -434,7 +439,12 @@ class MainWindow(QtWidgets.QMainWindow):
         list_objs.append(axisZ)
 
         if time > 0:
-            cube = Box(center=vec3(0), width=time)
+            if not bool(self.accumulate.checkState()):
+                cube = Box(center=vec3(0), width=time)
+            else:
+                t = self.maxTime.value()
+                t = t if t%2 == 0 else t-1
+                cube = Box(center=vec3(0), width=t)
             list_objs.append(cube)
 
         self.objs = {}
@@ -470,7 +480,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time)
+            self.histogram.set_time(time, accumulate=bool(self.accumulate.checkState()))
             self.histogram.show()
 
         else:
@@ -483,7 +493,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time)
+            self.histogram.set_time(time, accumulate=bool(self.accumulate.checkState()))
             self.histogram.show()
 
         del self.objs

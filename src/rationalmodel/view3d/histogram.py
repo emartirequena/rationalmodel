@@ -200,16 +200,22 @@ class Histogram(QtWidgets.QWidget):
         self.show()
         self.update()
 
-    def set_time(self, time):
+    def set_time(self, time, accumulate=False):
         self.time = time
-        self._make_items()
+        self._make_items(accumulate)
         if self.change_flag:
             self.scene.fit()
             self.change_flag = False
         self.reset()
 
-    def _make_items(self):
-        space = self.spacetime.spaces.spaces[self.time]
+    def _make_items(self, accumulate):
+        if not accumulate:
+            space = self.spacetime.spaces.spaces[self.time]
+        else:
+            if self.time%2 == 0:
+                space = self.spacetime.spaces.totals_even
+            else:
+                space = self.spacetime.spaces.totals_odd
 
         dict_objs = {}
 
@@ -221,8 +227,7 @@ class Histogram(QtWidgets.QWidget):
             if num:
                 if num > max:
                     max = num
-                if num not in dict_objs:
-                    dict_objs[num] = 0
+                if num not in dict_objs: dict_objs[num] = 0
                 dict_objs[num] += 1
                 count += 1
 
