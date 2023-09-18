@@ -3,6 +3,7 @@ from PyQt5.QtGui import QMouseEvent, QWheelEvent, QKeyEvent
 from PIL import Image, ImageDraw
 from madcad import vec3
 import numpy as np
+import gc
 
 from config import Config
 from color import ColorLine
@@ -145,8 +146,9 @@ class Scene:
 class Histogram(QtWidgets.QWidget):
     def __init__(self, parent=None):
         super().__init__(parent=parent)
-        self.spacetime = None
+        self.spacetime: SpaceTime = None
         self.time = 0
+        self.accumulate = False
         if not parent:
             self.config = Config()
         else:
@@ -188,11 +190,13 @@ class Histogram(QtWidgets.QWidget):
         self.scene.clear(number)
 
     def set_spacetime(self, spacetime):
-        if self.spacetime is not spacetime:
-            self.spacetime = spacetime
+        if not spacetime:
+            return
+        if not self.spacetime or self.spacetime.T != spacetime.T:
             self.change_flag = True
         else:
             self.change_flag = False
+        self.spacetime = spacetime
 
     def reset(self):
         img = self.scene.render()
@@ -202,28 +206,24 @@ class Histogram(QtWidgets.QWidget):
 
     def set_time(self, time, accumulate=False):
         self.time = time
-        self._make_items(accumulate)
+        self.accumulate = accumulate
+        self._make_items()
         if self.change_flag:
             self.scene.fit()
             self.change_flag = False
         self.reset()
 
-    def _make_items(self, accumulate):
-        if not accumulate:
-            space = self.spacetime.spaces.spaces[self.time]
-        else:
-            if self.time%2 == 0:
-                space = self.spacetime.spaces.totals_even
-            else:
-                space = self.spacetime.spaces.totals_odd
+    def _make_items(self):
+        space = self.spacetime.getSpace(self.time, self.accumulate)
 
         dict_objs = {}
 
+        view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
+
         count = 0
         max = -1
-        for i in range(len(space.cells)):
-            cell = space.cells[i].get()
-            num = cell['count']
+        for cell in view_cells:
+            num = cell.count
             if num:
                 if num > max:
                     max = num
@@ -238,9 +238,12 @@ class Histogram(QtWidgets.QWidget):
             alpha = float(num) / float(max)
             pos = float(num)
             color = self.color.getColor(alpha)
-            # height = float(dict_objs[num]) / float(count)
             height = float(dict_objs[num])
             self.scene.add(pos, height, color)
+
+        del view_cells
+        del dict_objs
+        gc.collect()
 
     def prepare_save(self, ctx=None):
         self.old_time = self.time
