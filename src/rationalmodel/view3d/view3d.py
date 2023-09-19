@@ -243,8 +243,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.statusLabel)
         self.setStatusBar(self.statusBar)
 
+    def check_accumulate(self):
+        return bool(self.accumulate.checkState())
+
     def setTimeInit(self):
-        print('------- set 0 time')
+        print('------- set init time')
         self.timeWidget.setValue(0)
 
     def setTimeEnd(self):
@@ -270,14 +273,20 @@ class MainWindow(QtWidgets.QMainWindow):
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def _makePath(self, period, number):
-        factors = self.get_output_factors(number)
-        base_path  = os.path.join(self.config.get('image_path'), f'P{period:02d}')
-        if not os.path.exists(base_path):
-            os.makedirs(base_path)
-        path = os.path.join(base_path, f'N{number:d}_F{factors}')
-        if not os.path.exists(path):
-            os.makedirs(path)
-        return path
+        if self.check_accumulate():
+            base_path = os.path.join(self.config.get('image_path'), f'P{period:02d}', 'Accumulate')
+            if not os.path.exists(base_path):
+                os.makedirs(base_path)
+            return base_path
+        else:
+            factors = self.get_output_factors(number)
+            base_path  = os.path.join(self.config.get('image_path'), f'P{period:02d}')
+            if not os.path.exists(base_path):
+                os.makedirs(base_path)
+            path = os.path.join(base_path, f'N{number:d}_F{factors}')
+            if not os.path.exists(path):
+                os.makedirs(path)
+            return path
 
     def _saveImages(self, init_time, end_time):
         self.setStatus('Saving images...')
@@ -314,8 +323,14 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.view_histogram:
                 hist_img = self.histogram.save_image(time)
                 img.alpha_composite(hist_img)
-                hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-            img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+                if self.check_accumulate():
+                    hist_img.save(os.path.join(path, f'Accum_Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+                else:
+                    hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            if self.check_accumulate():
+                img.save(os.path.join(path, f'Accum_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+            else:
+                img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
             scene.displays.clear()
             del objs
             gc.collect()
@@ -325,12 +340,13 @@ class MainWindow(QtWidgets.QMainWindow):
         del view
         self.histogram.end_save()
         gc.collect()
+        self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
-        if init_time != end_time:
+        if init_time != end_time and not self.check_accumulate():
             in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
             out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
-            self.setStatus('Making video...')
+            self.setStatus('Making main sequence video...')
             make_video(
                 ffmpeg_path, 
                 in_sequence_path, out_video_path, 
@@ -355,14 +371,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 os.makedirs(video_path)
             dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
             shutil.copyfile(out_video_path, dest_video_path)
-        
-        self.setStatus('Images saved...')
+
+            self.setStatus('Videos saved...')
 
     def saveImage(self):
         self._saveImages(self.time.value(), self.time.value())
 
     def saveVideo(self):
-        self._saveImages(0, self.maxTime.value())
+        if not self.check_accumulate():
+            self._saveImages(0, self.maxTime.value())
+        else:
+            self._saveImages(self.maxTime.value()-1, self.maxtime.value())
 
     def compute(self):
         if self.spacetime is not None:
@@ -401,7 +420,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if time > self.spacetime.len():
             return
         
-        space = self.spacetime.getSpace(time, accumulate=bool(self.accumulate.checkState()))
+        space = self.spacetime.getSpace(time, accumulate=self.check_accumulate())
 
         list_objs = []
 
@@ -446,7 +465,7 @@ class MainWindow(QtWidgets.QMainWindow):
         list_objs.append(axisZ)
 
         if time > 0:
-            if not bool(self.accumulate.checkState()):
+            if not self.check_accumulate():
                 cube = Box(center=vec3(0), width=time)
             else:
                 t = self.maxTime.value()
@@ -486,7 +505,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, bool(self.accumulate.checkState()))
+            self.histogram.set_time(time, self.check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
 
@@ -500,7 +519,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, bool(self.accumulate.checkState()))
+            self.histogram.set_time(time, self.check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
 
