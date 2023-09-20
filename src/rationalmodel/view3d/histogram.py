@@ -60,6 +60,7 @@ class Scene:
         else:
             self.scl = self.width / self.max_x
             self.ox = 0.
+        self.scale(self.width / 2.0, -1.0)
 
     def translate(self, dist: float):
         self.ox += dist / self.scl
