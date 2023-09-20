@@ -83,6 +83,8 @@ class Spaces:
 
 	def add(self, t, x, y=0, z=0):
 		self.spaces[t].add(x, y, z)
+		if x == y == z == t * c or x == y == z == -t * c:
+			return
 		if t%2 == 0:
 			self.accumulates_even.add(x, y, z)
 		else:
