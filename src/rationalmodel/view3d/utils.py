@@ -1,3 +1,4 @@
+import os
 from functools import reduce
 from copy import copy
 import subprocess
@@ -5,6 +6,10 @@ import subprocess
 
 def lerp(t, ta, a, tb, b):
     return a + (b-a)*(t-ta)/(tb-ta)
+
+
+def check_ffmpeg(ffmpeg_path: str) -> bool:
+    return os.path.exists(ffmpeg_path)
 
 
 def make_video(
@@ -18,6 +23,8 @@ def make_video(
         image_resx: int=1920, 
         image_resy: int=1080
 ):
+    if not check_ffmpeg(ffmpeg_path):
+        return False
     options = [
         ffmpeg_path,
         '-y',
@@ -31,6 +38,7 @@ def make_video(
     ]
     print(*options)
     subprocess.run(options)
+    return True
 
 
 def appendEs2Sequences(sequences, es):

@@ -347,13 +347,16 @@ class MainWindow(QtWidgets.QMainWindow):
             in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
             out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
             self.setStatus('Making main sequence video...')
-            make_video(
+            result = make_video(
                 ffmpeg_path, 
                 in_sequence_path, out_video_path, 
                 video_codec, video_format, 
                 frame_rate, bit_rate, 
                 image_resx, image_resy
             )
+            if not result:
+                self.setStatus('ffmepg not found... (check config.json file specification)')
+                return
 
             in_sequence_path = os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.%04d.png')
             out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{factors}.{video_format}')
