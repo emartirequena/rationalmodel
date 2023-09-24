@@ -114,18 +114,18 @@ def create_rational(args):
 	return Rational(m, n, dim)
 
 
-def add_rational(args):
-	conn, max, dim, r, t, x, y, z = args
-	r = args[3]
-	for rt in range(0, max + 1):
-		pos = list(r.position(rt))
-		pos[0] += x
-		if dim > 1:
-			pos[1] += y
-		if dim > 2:
-			pos[2] += z
-		conn.send((t+rt, *pos))
-	conn.send(None)
+# def add_rational(args):
+# 	conn, max, dim, r, t, x, y, z = args
+# 	r = args[3]
+# 	for rt in range(0, max + 1):
+# 		pos = list(r.position(rt))
+# 		pos[0] += x
+# 		if dim > 1:
+# 			pos[1] += y
+# 		if dim > 2:
+# 			pos[2] += z
+# 		conn.send((t+rt, *pos))
+# 	conn.send(None)
 
 
 class SpaceTime(object):
@@ -158,6 +158,7 @@ class SpaceTime(object):
 		params = []
 		for m in range(n + 1):
 			params.append((m, n, self.dim))
+
 		unordered_set = p.imap(func=create_rational, iterable=params, chunksize=1000)
 		p.close()
 		p.join()
@@ -177,32 +178,31 @@ class SpaceTime(object):
 			self.spaces.add(t+rt, *pos)
 
 	def addRationalSet(self, t=0, x=0, y=0, z=0):
-		# if self.rationalSet[0].n > 300000:
+		# p = Pool(cpu_count())
+		# params = []
+		# connections = []
+		# for r in self.rationalSet:
 		# 	conn1, conn2 = Pipe()
+		# 	connections.append((conn1, conn2))
+		# 	params.append((conn1, self.max, self.dim, r, t, x, y, z))
+		# p.imap(func=add_rational, iterable=params, chunksize=1000)
+		# print('------ connections created...')
 
-		# 	p = Pool(cpu_count())
-		# 	params = []
-		# 	for r in self.rationalSet:
-		# 		params.append((conn1, self.max, self.dim, r, t, x, y, z))
-		# 	p.imap(func=add_rational, iterable=params, chunksize=1000)
-
-		# 	count = 0
-		# 	while True:
+		# count = 0
+		# while True:
+		# 	for connection in connections:
+		# 		conn1, conn2 = connection
 		# 		obj = conn2.recv()
 		# 		if obj is None:
 		# 			count += 1
 		# 		else:
 		# 			t, x, y, z = obj
 		# 			self.add(t, x, y, z)
-		# 		if count == len(params):
-		# 			break
+		# 	if count == len(params):
+		# 		break
 
-		# 	p.close()
-		# 	p.join()
-
-		# else:
-		# 	for r in self.rationalSet:
-		# 		self.add_rational(r, t, x, y, z)
+		# p.close()
+		# p.join()
 
 		for r in self.rationalSet:
 			self.add_rational(r, t, x, y, z)

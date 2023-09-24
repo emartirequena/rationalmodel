@@ -128,19 +128,19 @@ class Scene:
         return img
 
     @staticmethod
-    def _pil2pixmap(im):
-        if im.mode == "RGB":
-            r, g, b = im.split()
-            im = Image.merge("RGB", (b, g, r))
-        elif  im.mode == "RGBA":
-            r, g, b, a = im.split()
-            im = Image.merge("RGBA", (b, g, r, a))
-        elif im.mode == "L":
-            im = im.convert("RGBA")
-        im2 = im.convert("RGBA")
-        data = im2.tobytes("raw", "RGBA")
-        qim = QtGui.QImage(data, im.size[0], im.size[1], QtGui.QImage.Format_ARGB32)
-        pixmap = QtGui.QPixmap.fromImage(qim)
+    def _pil2pixmap(img):
+        if img.mode == "RGB":
+            r, g, b = img.split()
+            img = Image.merge("RGB", (b, g, r))
+        elif  img.mode == "RGBA":
+            r, g, b, a = img.split()
+            img = Image.merge("RGBA", (b, g, r, a))
+        elif img.mode == "L":
+            img = img.convert("RGBA")
+        img2 = img.convert("RGBA")
+        data = img2.tobytes("raw", "RGBA")
+        qimg = QtGui.QImage(data, img.size[0], img.size[1], QtGui.QImage.Format_ARGB32)
+        pixmap = QtGui.QPixmap.fromImage(qimg)
         return pixmap
 
 
@@ -149,6 +149,7 @@ class Histogram(QtWidgets.QWidget):
         super().__init__(parent=parent)
         self.spacetime: SpaceTime = None
         self.time = 0
+        self.number = 0
         self.accumulate = False
         if not parent:
             self.config = Config()
@@ -187,7 +188,9 @@ class Histogram(QtWidgets.QWidget):
         self.old_pos = 0.
 
     def set_number(self, number):
-        self.hist_max = int(number)
+        if self.number != number:
+            self.change_flag = True
+        self.number = number
         self.scene.clear(number)
 
     def set_spacetime(self, spacetime):
@@ -252,6 +255,8 @@ class Histogram(QtWidgets.QWidget):
     def save_image(self, time):
         self.time = time
         self._make_items()
+        if self.accumulate:
+            self.scene.fit()
         img = self.scene.render()
         return img.convert('RGBA')
 
