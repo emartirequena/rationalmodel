@@ -1,7 +1,8 @@
 import os
+import sys
+import time
 import math
 import shutil
-import sys
 from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
@@ -44,8 +45,6 @@ class MainView(rendering.View):
     def control(self, key, evt):
         if evt.type() == 3:
             return self.mouseClick(evt)
-        if self.mainWindow.rendering:
-            return False
         return super().control(key, evt)
 
 
@@ -243,7 +242,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar.addWidget(self.statusLabel)
         self.setStatusBar(self.statusBar)
 
-    def check_accumulate(self):
+    def _check_accumulate(self):
         return bool(self.accumulate.checkState())
 
     def setTimeInit(self):
@@ -273,20 +272,14 @@ class MainWindow(QtWidgets.QMainWindow):
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def _makePath(self, period, number):
-        if self.check_accumulate():
-            base_path = os.path.join(self.config.get('image_path'), f'P{period:02d}', 'Accumulate')
-            if not os.path.exists(base_path):
-                os.makedirs(base_path)
-            return base_path
+        if self._check_accumulate():
+            path = os.path.join(self.config.get('image_path'), f'P{period:02d}', 'Accumulate')
         else:
             factors = self.get_output_factors(number)
-            base_path  = os.path.join(self.config.get('image_path'), f'P{period:02d}')
-            if not os.path.exists(base_path):
-                os.makedirs(base_path)
-            path = os.path.join(base_path, f'N{number:d}_F{factors}')
-            if not os.path.exists(path):
-                os.makedirs(path)
-            return path
+            path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', f'N{number:d}_F{factors}')
+        if not os.path.exists(path):
+            os.makedirs(path)
+        return path
 
     def _saveImages(self, init_time, end_time):
         self.setStatus('Saving images...')
@@ -315,65 +308,95 @@ class MainWindow(QtWidgets.QMainWindow):
         view.resize((image_resx, image_resy))
 
         self.histogram.prepare_save(ctx=scene.ctx)
+
         for time in range(init_time, end_time + 1):
             scene.displays.clear()
             objs = self.make_objects(time=time, make_view=False)
             scene.add(objs)
             img = view.render()
+            
+            file_name = f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'
             if self.view_histogram:
+                hist_name = 'Hist_' + file_name
                 hist_img = self.histogram.save_image(time)
                 img.alpha_composite(hist_img)
-                if self.check_accumulate():
-                    hist_img.save(os.path.join(path, f'Accum_Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-                else:
-                    hist_img.save(os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-            if self.check_accumulate():
-                img.save(os.path.join(path, f'Accum_P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
-            else:
-                img.save(os.path.join(path, f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'))
+                if self._check_accumulate():
+                    hist_name = 'Accum_' + hist_name
+                hist_img.save(os.path.join(path, hist_name))
+
+            if self._check_accumulate():
+                file_name = 'Accum_' + file_name
+            img.save(os.path.join(path, file_name))
+            
             scene.displays.clear()
             del objs
             gc.collect()
+        
         del projection
         del navigation
         del scene
         del view
+        
         self.histogram.end_save()
+
         gc.collect()
         self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
-        if init_time != end_time and not self.check_accumulate():
-            in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
-            out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
-            self.setStatus('Making main sequence video...')
-            result = make_video(
-                ffmpeg_path, 
-                in_sequence_path, out_video_path, 
-                video_codec, video_format, 
-                frame_rate, bit_rate, 
-                image_resx, image_resy
-            )
-            if not result:
-                self.setStatus('ffmepg not found... (check config.json file specification)')
-                return
+        if init_time != end_time:
 
-            in_sequence_path = os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.%04d.png')
-            out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{factors}.{video_format}')
-            self.setStatus('Making histogram video...')
-            make_video(
-                ffmpeg_path, 
-                in_sequence_path, out_video_path, 
-                video_codec, video_format, 
-                frame_rate, bit_rate, 
-                histogram_resx, histogram_resy
-            )
+            if not self._check_accumulate():
+                in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
+                out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                self.setStatus('Making main sequence video...')
+                result = make_video(
+                    ffmpeg_path, 
+                    in_sequence_path, out_video_path, 
+                    video_codec, video_format, 
+                    frame_rate, bit_rate, 
+                    image_resx, image_resy
+                )
+                if not result:
+                    self.setStatus('ffmepg not found... (check config.json file specification)')
+                    return
 
-            self.setStatus('Copying video...')
-            if not os.path.exists(video_path):
-                os.makedirs(video_path)
-            dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
-            shutil.copyfile(out_video_path, dest_video_path)
+                in_sequence_path = os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.%04d.png')
+                out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                self.setStatus('Making histogram video...')
+                make_video(
+                    ffmpeg_path, 
+                    in_sequence_path, out_video_path, 
+                    video_codec, video_format, 
+                    frame_rate, bit_rate, 
+                    histogram_resx, histogram_resy
+                )
+
+                self.setStatus('Copying video...')
+                if not os.path.exists(video_path):
+                    os.makedirs(video_path)
+                dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                shutil.copyfile(out_video_path, dest_video_path)
+
+            else:
+                in_sequence_path = os.path.join(path, f'Accum_P{period:02d}_N{number}_F{factors}.%04d.png')
+                out_video_path = os.path.join(path, f'Accum_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                self.setStatus('Making main sequence video...')
+                result = make_video(
+                    ffmpeg_path, 
+                    in_sequence_path, out_video_path, 
+                    video_codec, video_format, 
+                    frame_rate, bit_rate, 
+                    image_resx, image_resy
+                )
+                if not result:
+                    self.setStatus('ffmepg not found... (check config.json file specification)')
+                    return
+
+                self.setStatus('Copying video...')
+                if not os.path.exists(video_path):
+                    os.makedirs(video_path)
+                dest_video_path = os.path.join(video_path, f'Accum_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                shutil.copyfile(out_video_path, dest_video_path)
 
             self.setStatus('Videos saved...')
 
@@ -381,10 +404,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._saveImages(self.time.value(), self.time.value())
 
     def saveVideo(self):
-        if not self.check_accumulate():
+        if not self._check_accumulate():
             self._saveImages(0, self.maxTime.value())
         else:
-            self._saveImages(self.maxTime.value()-1, self.maxtime.value())
+            self._saveImages(0, 1)
 
     def compute(self):
         if self.spacetime is not None:
@@ -395,9 +418,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.spacetime = None
             gc.collect(2)
 
-        self.setStatus('Creating incremental spacetime...')
-        self.rendering = True
+        init = time.time()
 
+        self.setStatus('Creating incremental spacetime...')
         self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
 
         self.setStatus(f'Setting rational set for number: {int(self.number.value())} ...')
@@ -412,6 +435,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.make_objects()
         self.period_changed = False
+
+        end = time.time()
+        print(f'------- compute time = {int(end-init)}')
         
     def make_objects(self, time:int=0, make_view:bool=True):
         if not self.spacetime:
@@ -423,7 +449,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if time > self.spacetime.len():
             return
         
-        space = self.spacetime.getSpace(time, accumulate=self.check_accumulate())
+        space = self.spacetime.getSpace(time, accumulate=self._check_accumulate())
 
         list_objs = []
 
@@ -468,7 +494,7 @@ class MainWindow(QtWidgets.QMainWindow):
         list_objs.append(axisZ)
 
         if time > 0:
-            if not self.check_accumulate():
+            if not self._check_accumulate():
                 cube = Box(center=vec3(0), width=time)
             else:
                 t = self.maxTime.value()
@@ -508,7 +534,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self.check_accumulate())
+            self.histogram.set_time(time, self._check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
 
@@ -519,10 +545,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.scene.render(self.view)
             self.view.show()
             self.view.update()
-            if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self.check_accumulate())
+            self.histogram.set_time(time, self._check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
 
@@ -634,10 +659,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
+    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+    app = QtWidgets.QApplication(sys.argv)
     freeze_support()
     settings.load(settings_file)
-    app = QtWidgets.QApplication(sys.argv)
-    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
     wi = MainWindow()
     wi.show()
     sys.exit(app.exec())

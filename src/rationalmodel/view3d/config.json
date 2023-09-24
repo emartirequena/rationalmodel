@@ -15,7 +15,7 @@
         {"alpha": 1.0, "color": [1.0, 0.5, 0.2]}
     ],
     "rad_factor": 2.3,
-    "rad_pow": 0.8,
+    "rad_pow": 0.5,
     "rad_min": 0.02,
     "max_faces": 20,
     "faces_pow": 0.2,
