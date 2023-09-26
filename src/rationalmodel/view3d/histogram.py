@@ -85,15 +85,15 @@ class Scene:
         return x_step, x_max
 
     def _render_grid(self, draw):
-        colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (0, 100, 200), (255, 255, 0)]
+        colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
         x_base = 10
         y_base = 5
 
         y_step, y_max = self._get_y_step_max(y_base)
         for y in range(y_step, y_max, y_step):
             color = colors[0]
-            if   y % (10 * y_step) == 0: color = colors[1]
-            elif y % ( 5 * y_step) == 0: color = colors[2]
+            if y % ( 5 * y_step) == 0: color = colors[2]
+            if y % (10 * y_step) == 0: color = colors[1]
             if self._loga(y_base, y) >= 1 and color == colors[0]:
                 continue
             h = np.power(y / y_max, self.y_factor) * self.height
@@ -103,11 +103,10 @@ class Scene:
         for x in range(-x_max, x_max, x_step):
 
             color = colors[0]
-            if x == 0: color = colors[4]
+            if x == 0: color = colors[3]
             else:
-                if abs(x_max - x) % (10 * x_step) == 0: color = colors[2]
-                if abs(x_max - x) % ( 5 * x_step) == 0: color = colors[1]
-
+                if abs(x_max - x) % ( 5 * x_step) == 0: color = colors[2]
+                if abs(x_max - x) % (10 * x_step) == 0: color = colors[1]
             px = int((x + self.ox) * self.scl)
             if px < 0 or px > self.width: continue
             w = 1 if np.abs(px) > 0.1 else 3
@@ -208,8 +207,9 @@ class Histogram(QtWidgets.QWidget):
         self.show()
         self.update()
 
-    def set_time(self, time, accumulate=False):
+    def set_time(self, time, max_time, accumulate=False):
         self.time = time
+        self.max_time =max_time
         self.accumulate = accumulate
         self._make_items()
         if self.change_flag:
@@ -228,12 +228,11 @@ class Histogram(QtWidgets.QWidget):
         max = -1
         for cell in view_cells:
             num = cell.count
-            if num:
-                if num > max:
-                    max = num
-                if num not in dict_objs: dict_objs[num] = 0
-                dict_objs[num] += 1
-                count += 1
+            if num > max:
+                max = num
+            if num not in dict_objs: dict_objs[num] = 0
+            dict_objs[num] += 1
+            count += 1
 
         print(f'hist: ------- time: {self.time}, count: {count}, max: {max}, len: {len(dict_objs)}')
 
@@ -319,7 +318,7 @@ if __name__ == '__main__':
     histogram = Histogram()
     histogram.set_number(n)
     histogram.set_spacetime(spacetime)
-    histogram.set_time(max)
+    histogram.set_time(max, max)
     histogram.show()
 
     sys.exit(app.exec())
