@@ -81,9 +81,9 @@ class Spaces:
 	def __del__(self):
 		del self.spaces
 
-	def add(self, t, x, y=0, z=0):
+	def add(self, is_special, t, x, y=0, z=0):
 		self.spaces[t].add(x, y, z)
-		if x == y == z == t * c or x == y == z == -t * c:
+		if (x == y == z == t * c or x == y == z == -t * c) and is_special:
 			return
 		if t%2 == 0:
 			self.accumulates_even.add(x, y, z)
@@ -144,8 +144,8 @@ class SpaceTime(object):
 	def len(self):
 		return self.max
 
-	def add(self, t, x, y=0, z=0):
-		self.spaces.add(t, x, y , z)
+	def add(self, is_special, t, x, y=0, z=0):
+		self.spaces.add(t, is_special, x, y , z)
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		return self.spaces.getCell(t, x, y, z, accumulate)
@@ -167,17 +167,24 @@ class SpaceTime(object):
 		del unordered_set
 		gc.collect()
 
-	def add_rational(self, r, t, x, y, z):
-		for rt in range(0, self.max + 1):
+	def add_rational(self, r, t, x, y, z, accumulate, is_special):
+		if accumulate and is_special:
+			cycle = self.max // self.T
+			begin = self.T * (cycle - 1)
+			end = self.T * cycle + 1
+		else:
+			begin = 0
+			end = self.max + 1
+		for rt in range(begin, end):
 			pos = list(r.position(rt))
 			pos[0] += x
 			if self.dim > 1:
 				pos[1] += y
 			if self.dim > 2:
 				pos[2] += z
-			self.spaces.add(t+rt, *pos)
+			self.spaces.add(is_special, t+rt, *pos)
 
-	def addRationalSet(self, t=0, x=0, y=0, z=0):
+	def addRationalSet(self, is_special=False, accumulate=False, t=0, x=0, y=0, z=0):
 		# p = Pool(cpu_count())
 		# params = []
 		# connections = []
@@ -205,7 +212,7 @@ class SpaceTime(object):
 		# p.join()
 
 		for r in self.rationalSet:
-			self.add_rational(r, t, x, y, z)
+			self.add_rational(r, t, x, y, z, accumulate, is_special)
 
 if __name__ == '__main__':
 	print('Creating spacetime...')

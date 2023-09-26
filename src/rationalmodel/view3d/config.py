@@ -21,8 +21,10 @@ class Config:
                 {'alpha': 0.5, 'color': [0.3, 0.6, 0.5]},
                 {'alpha': 1.0, 'color': [1.0, 0.5, 0.2]}
             ],
-            'rad_factor': 2.3,
+            'rad_factor': 8.0,
             'rad_pow': 0.8,
+            'rad_factor_accum': 2.3,
+            'rad_pow_accum': 0.3,
             'rad_min': 0.02,
             'max_faces': 20,
             'faces_pow': 0.2,

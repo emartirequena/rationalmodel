@@ -12,6 +12,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from spacetime import SpaceTime
+from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video
 from config import Config
 from color import ColorLine
@@ -34,10 +35,11 @@ class MainView(rendering.View):
             center = self.scene.item(obj).box.center
             t = self.mainWindow.timeWidget.value()
             spacetime = self.mainWindow.spacetime
-            cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=bool(self.mainWindow.accumulate.checkState()))
+            cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=self.mainWindow._check_accumulate())
             max = self.mainWindow.num or 1
-            percent = 100.0 * float(cell.count) / float(max)
-            text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {cell.count} / {max}, percent: {percent:.2f}%'
+            count = cell.count
+            percent = 100.0 * float(count) / float(max)
+            text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {count} / {max}, percent: {percent:.2f}%'
             self.mainWindow.setStatus(text)
             return True
         return False
@@ -410,6 +412,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._saveImages(0, 1)
 
     def compute(self):
+        init = time.time()
+
         if self.spacetime is not None:
             print('------- del spacetime...')
             if self.histogram is not None:
@@ -418,8 +422,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.spacetime = None
             gc.collect(2)
 
-        init = time.time()
-
         self.setStatus('Creating incremental spacetime...')
         self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
 
@@ -427,9 +429,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.spacetime.setRationalSet(int(self.number.value()))
 
         self.setStatus('Adding rational set...')
-        self.spacetime.addRationalSet()
+        self.spacetime.addRationalSet(self.is_special, self._check_accumulate())
         self.setStatus(f'Rational set added for number {int(self.number.value())}')
-        
+    
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
@@ -450,7 +452,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         
         space = self.spacetime.getSpace(time, accumulate=self._check_accumulate())
-
+        view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
         list_objs = []
 
         self.setStatus(f'Drawing time: {time} ...')
@@ -458,9 +460,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.num = 0
         max = -1
         self.count = 0
-        for i in range(len(space.cells)):
-            cell = space.cells[i].get()
-            num = cell['count']
+        for cell in view_cells:
+            num = cell.count
             if num > max:
                 max = num
             if num > 0:
@@ -468,13 +469,15 @@ class MainWindow(QtWidgets.QMainWindow):
             self.num += num
         self.setStatus(f'Creating {self.count} spheres at time: {time}')
 
-        rad_factor = self.config.get('rad_factor')
-        rad_pow = self.config.get('rad_pow')
+        if not self._check_accumulate():
+            rad_factor = self.config.get('rad_factor')
+            rad_pow = self.config.get('rad_pow')
+        else:
+            rad_factor = self.config.get('rad_factor_accum')
+            rad_pow = self.config.get('rad_pow_accum')
         rad_min = self.config.get('rad_min')
         max_faces = self.config.get('max_faces')
         faces_pow = self.config.get('faces_pow')
-
-        view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
 
         for cell in view_cells:
             alpha = float(cell.count) / float(max)
@@ -484,6 +487,7 @@ class MainWindow(QtWidgets.QMainWindow):
             sphere = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             sphere.option(color=self.color.getColor(alpha))
             list_objs.append(sphere)
+        
         del view_cells
 
         axisX = Axis(vec3(0), X)
@@ -534,7 +538,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self._check_accumulate())
+            self.histogram.set_time(time, self.maxTime.value(), self._check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
 
@@ -547,7 +551,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.update()
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self._check_accumulate())
+            self.histogram.set_time(time, self.maxTime.value(), self._check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
 
@@ -619,9 +623,11 @@ class MainWindow(QtWidgets.QMainWindow):
         label = self.get_factors(list(self.numbers.keys())[-1])
         self.factorsLabel.setText(label)
         self.label_num_divisors.setText(f'{len(self.divisors)}')
-        self.maxTime.setValue(T * (4 if T < 8 else (3 if T < 17 else 2)))
+        self.cycles = (4 if T < 8 else (3 if T < 17 else 2))
+        self.maxTime.setValue(T * self.cycles)
+        self.maxTime.setSingleStep(T)
 
-    def fillDivisors(self, T):
+    def fillDivisors(self, T: int):
         a = int(8)
         b = int(T)
         c = int(2)
@@ -638,9 +644,9 @@ class MainWindow(QtWidgets.QMainWindow):
             x: int = record['number']
             factors: dict = record['factors']
             period: int = record['period']
-            txt = f'{x} ({period}) = {self.get_factors(x)}'
-            item = QtWidgets.QListWidgetItem(txt)
+            item = QtWidgets.QListWidgetItem(f'{x} ({period}) = {self.get_factors(x)}')
             is_prime: bool = True if x in factors.keys() and factors[x] == 1 else False
+            is_special: bool = False
             if period != T:
                 if is_prime:
                     item.setForeground(QtGui.QBrush(Qt.red))
@@ -649,12 +655,15 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 if x in specials:
                     item.setForeground(QtGui.QBrush(Qt.darkGreen))
+                    is_special = True
                 elif is_prime:
                     item.setForeground(QtGui.QBrush(Qt.blue))
+            item.setData(Qt.UserRole, is_special)
             self.divisors.addItem(item)
                 
     def setNumber(self, index):
         item = self.divisors.item(index.row())
+        self.is_special = item.data(Qt.UserRole)
         self.number.setValue(int(item.text().split(' ', 1)[0]))
 
 
