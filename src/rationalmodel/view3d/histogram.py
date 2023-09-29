@@ -207,9 +207,8 @@ class Histogram(QtWidgets.QWidget):
         self.show()
         self.update()
 
-    def set_time(self, time, max_time, accumulate=False):
+    def set_time(self, time, accumulate=False):
         self.time = time
-        self.max_time =max_time
         self.accumulate = accumulate
         self.display_all()
 
@@ -227,25 +226,23 @@ class Histogram(QtWidgets.QWidget):
 
         view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
 
-        count = 0
         max = -1
         for cell in view_cells:
-            num = cell.count
-            if num > max:
-                max = num
-            if num not in dict_objs: dict_objs[num] = 0
-            dict_objs[num] += 1
-            count += 1
+            count = cell.count
+            if count > max:
+                max = count
+            if count not in dict_objs: dict_objs[count] = 0
+            dict_objs[count] += 1
 
         self.scene.clear()
-        for num in dict_objs.keys():
-            alpha = float(num) / float(max)
-            pos = float(num)
-            if self.parent() and self.parent().is_selected(num):
+        for count in dict_objs.keys():
+            alpha = float(count) / float(max)
+            pos = float(count)
+            if self.parent() and self.parent().is_selected(count):
                 color = vec3(255, 255, 255)
             else:
                 color = self.color.getColor(alpha)
-            height = float(dict_objs[num])
+            height = float(dict_objs[count])
             self.scene.add(pos, height, color)
 
         del view_cells
