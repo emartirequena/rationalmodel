@@ -425,30 +425,22 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self._saveImages(0, 1)
 
-    def _switch_display(self, count, state= None):
+    def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
             disp = self.view.scene.item([0])[0].displays[id]
             if type(disp).__name__ in ('SolidDisplay', 'WebDisplay'):
                 disp.vertices.selectsub(0)
-                # disp.selected = any(disp.vertices.flags & 0x1)
                 disp.selected = state if state is not None else not any(disp.vertices.flags & 0x1)
             else:
-                disp.selected = state if state is not None else not  disp.selected
+                disp.selected = state if state is not None else not disp.selected
 
-    def select_cells(self, count, state=None):
-        if state is None:
-            if not count in self.selected:
-                self.selected[count] = self.cell_ids[count]
-                self._switch_display(count, True)
-            else:
-                self._switch_display(count, False)
-                del self.selected[count]
+    def select_cells(self, count):
+        if count not in self.selected:
+            self.selected[count] = self.cell_ids[count]
+            self._switch_display(count, True)
         else:
-            if state is True and count not in self.selected:
-                self.selected[count] = self.cell_ids[count]
-                self._switch_display(count, True)
-            elif state is False and count in self.selected:
-                self._switch_display(count, False)
+            self._switch_display(count, False)
+            del self.selected[count]
         self.view.update()
         self.histogram.display_all()
         self.histogram.update()
@@ -464,19 +456,25 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus(text)
     
     def select_all(self):
-        self.selected = {}
         for count in self.cell_ids:
-            self.select_cells(count, True)
+            if count not in self.selected:
+                self.selected[count] = self.cell_ids[count]
+                self._switch_display(count, True)
         self.print_selection()
-        self.histogram.display_all()
-        self.histogram.update()
+        if self.view:
+            self.view.update()
+        if self.histogram:
+            self.histogram.display_all()
+            self.histogram.update()
 
     def deselect_all(self):
         for count in self.selected:
-            self.select_cells(count, False)
+            self._switch_display(count, False)
         self.selected = {}
         gc.collect()       
         self.print_selection()
+        if self.view:
+            self.view.update()
         if self.histogram:
             self.histogram.display_all()
             self.histogram.update()
@@ -495,6 +493,9 @@ class MainWindow(QtWidgets.QMainWindow):
         return num_cells, total_paths
 
     def compute(self):
+        if not int(self.number.value()):
+            return
+
         init = time.time()
 
         if self.spacetime is not None:
@@ -533,6 +534,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         if make_view:
             time = self.timeWidget.value()
+            self.deselect_all()
         if time > self.spacetime.len():
             return
         
@@ -629,12 +631,11 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self.maxTime.value(), self._check_accumulate())
+            self.histogram.set_time(time, self._check_accumulate())
             self.histogram.show()
 
         else:
             print('continue setting number...')
-            self.deselect_all()
             self.view.scene.displays.clear()
             self.view.scene.add(self.objs)
             self.view.scene.render(self.view)
@@ -642,16 +643,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.update()
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self.maxTime.value(), self._check_accumulate())
+            self.histogram.set_time(time, self._check_accumulate())
             self.histogram.show()
 
         del self.objs
         self.objs = {}
         gc.collect()
-        if self.num and self._check_accumulate():
-            self.setStatus(f'center: {100.0 * self.stat_center / self.num:0.2f}%, other: {100.0 * self.stat_other / self.num:0.2f}%')
-        else:
-            self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
+        self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
 
     def fit_histogram(self):
         if not self.histogram or not self.view_histogram:
