@@ -21,8 +21,8 @@
     "rad_min": 0.02,
     "max_faces": 20,
     "faces_pow": 0.2,
-    "histogram_resx": 700,
-    "histogram_resy": 100,
+    "histogram_resx": 1000,
+    "histogram_resy": 200,
     "histogram_max": 10000,
     "histogram_y_factor": 0.75
 }

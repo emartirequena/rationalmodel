@@ -36,18 +36,16 @@ class MainView(rendering.View):
             t = self.mainWindow.timeWidget.value()
             spacetime = self.mainWindow.spacetime
             cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=self.mainWindow._check_accumulate())
-            max = self.mainWindow.num or 1
             count = cell.count
-            percent = 100.0 * float(count) / float(max)
-            text = f'position ({center.x:.1f}, {center.y:.1f}, {center.z:.1f}), num paths: {count} / {max}, percent: {percent:.2f}%'
-            self.mainWindow.setStatus(text)
+            self.mainWindow.select_cells(count)
+            self.mainWindow.print_selection()
             return True
         return False
 
     def control(self, key, evt):
         if evt.type() == 3:
             return self.mouseClick(evt)
-        return super().control(key, evt)
+        return False
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -56,6 +54,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setUpUi()
         self.count = 0
         self.objs = {}
+        self.cell_ids = {}
+        self.selected = {}
         self.view = None
         self.period_changed = False
         self.histogram = None
@@ -211,6 +211,20 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.menu.addMenu(self.menuUtils)
 
+        self.menuSelection = QtWidgets.QMenu('Selection')
+
+        self.actionSelectAll = QtWidgets.QAction('Select All', self)
+        self.actionSelectAll.setShortcut('A')
+        self.actionSelectAll.triggered.connect(self.select_all)
+        self.menuSelection.addAction(self.actionSelectAll)
+        
+        self.actionDeselectAll = QtWidgets.QAction('Deselect All', self)
+        self.actionDeselectAll.setShortcut('D')
+        self.actionDeselectAll.triggered.connect(self.deselect_all)
+        self.menuSelection.addAction(self.actionDeselectAll)
+        
+        self.menu.addMenu(self.menuSelection)
+
         self.menuTime = QtWidgets.QMenu('Time')
 
         self.actionLeft = QtWidgets.QAction('Increment time', self.centralWidget())
@@ -225,13 +239,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionRight.triggered.connect(self.incrementTime)
         self.menuTime.addAction(self.actionRight)
 
-        self.actionInit = QtWidgets.QAction('Set init time', self.centralWidget())
+        self.actionInit = QtWidgets.QAction('Go to init time', self.centralWidget())
         self.actionInit.setShortcut('Home')
         self.actionInit.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionInit.triggered.connect(self.setTimeInit)
         self.menuTime.addAction(self.actionInit)
 
-        self.actionEnd = QtWidgets.QAction('Set end time', self.centralWidget())
+        self.actionEnd = QtWidgets.QAction('Go to end time', self.centralWidget())
         self.actionEnd.setShortcut('End')
         self.actionEnd.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionEnd.triggered.connect(self.setTimeEnd)
@@ -309,7 +323,7 @@ class MainWindow(QtWidgets.QMainWindow):
         view = RenderView(scene, projection=projection, navigation=navigation)
         view.resize((image_resx, image_resy))
 
-        self.histogram.prepare_save(ctx=scene.ctx)
+        self.histogram.prepare_save_image(ctx=scene.ctx)
 
         for time in range(init_time, end_time + 1):
             scene.displays.clear()
@@ -320,7 +334,7 @@ class MainWindow(QtWidgets.QMainWindow):
             file_name = f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
-                hist_img = self.histogram.save_image(time)
+                hist_img = self.histogram.get_save_image(time)
                 img.alpha_composite(hist_img)
                 if self._check_accumulate():
                     hist_name = 'Accum_' + hist_name
@@ -339,7 +353,7 @@ class MainWindow(QtWidgets.QMainWindow):
         del scene
         del view
         
-        self.histogram.end_save()
+        self.histogram.end_save_image()
 
         gc.collect()
         self.setStatus('Images saved...')
@@ -411,6 +425,75 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self._saveImages(0, 1)
 
+    def _switch_display(self, count, state= None):
+        for id in self.cell_ids[count]:
+            disp = self.view.scene.item([0])[0].displays[id]
+            if type(disp).__name__ in ('SolidDisplay', 'WebDisplay'):
+                disp.vertices.selectsub(0)
+                # disp.selected = any(disp.vertices.flags & 0x1)
+                disp.selected = state if state is not None else not any(disp.vertices.flags & 0x1)
+            else:
+                disp.selected = state if state is not None else not  disp.selected
+
+    def select_cells(self, count, state=None):
+        if state is None:
+            if not count in self.selected:
+                self.selected[count] = self.cell_ids[count]
+                self._switch_display(count, True)
+            else:
+                self._switch_display(count, False)
+                del self.selected[count]
+        else:
+            if state is True and count not in self.selected:
+                self.selected[count] = self.cell_ids[count]
+                self._switch_display(count, True)
+            elif state is False and count in self.selected:
+                self._switch_display(count, False)
+        self.view.update()
+        self.histogram.display_all()
+        self.histogram.update()
+
+    def print_selection(self):
+        selected_cells, selected_paths = self.get_selected_paths()
+        max = self.num or 1
+        if selected_cells == 0:
+            self.setStatus('Selected cells: 0')
+            return
+        percent = 100.0 * float(selected_paths) / float(max)
+        text = f'Selected cells: {selected_cells}, num paths: {selected_paths} / {max}, percent: {percent:.2f}%'
+        self.setStatus(text)
+    
+    def select_all(self):
+        self.selected = {}
+        for count in self.cell_ids:
+            self.select_cells(count, True)
+        self.print_selection()
+        self.histogram.display_all()
+        self.histogram.update()
+
+    def deselect_all(self):
+        for count in self.selected:
+            self.select_cells(count, False)
+        self.selected = {}
+        gc.collect()       
+        self.print_selection()
+        if self.histogram:
+            self.histogram.display_all()
+            self.histogram.update()
+
+    def is_selected(self, count):
+        if count in self.selected:
+            return True
+        return False
+    
+    def get_selected_paths(self):
+        num_cells = 0
+        total_paths = 0
+        for count in self.selected:
+            num_cells += len(self.selected[count])
+            total_paths += count * len(self.selected[count])
+        return num_cells, total_paths
+
     def compute(self):
         init = time.time()
 
@@ -421,6 +504,8 @@ class MainWindow(QtWidgets.QMainWindow):
             del self.spacetime
             self.spacetime = None
             gc.collect(2)
+
+        self.deselect_all()
 
         self.setStatus('Creating incremental spacetime...')
         self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
@@ -453,10 +538,11 @@ class MainWindow(QtWidgets.QMainWindow):
         
         space = self.spacetime.getSpace(time, accumulate=self._check_accumulate())
         view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
-        list_objs = []
 
         self.setStatus(f'Drawing time: {time} ...')
 
+        self.stat_center = 0
+        self.stat_other = 0
         self.num = 0
         max = -1
         self.count = 0
@@ -467,6 +553,10 @@ class MainWindow(QtWidgets.QMainWindow):
             if num > 0:
                 self.count += 1
             self.num += num
+            if cell.x == cell.y == cell.z == 0.0:
+                self.stat_center += num
+            else:
+                self.stat_other += num
         self.setStatus(f'Creating {self.count} spheres at time: {time}')
 
         if not self._check_accumulate():
@@ -479,23 +569,30 @@ class MainWindow(QtWidgets.QMainWindow):
         max_faces = self.config.get('max_faces')
         faces_pow = self.config.get('faces_pow')
 
+        self.cell_ids = {}
+        self.objs = {}
+
         for cell in view_cells:
             alpha = float(cell.count) / float(max)
             rad = math.pow(alpha / rad_factor, rad_pow)
             if rad < rad_min:
                 rad = rad_min
+            id = self.config.getKey()
+            color = self.color.getColor(alpha)
+            if cell.count not in self.cell_ids:
+                self.cell_ids[cell.count] = []
+            self.cell_ids[cell.count].append(id)
             sphere = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             sphere.option(color=self.color.getColor(alpha))
-            list_objs.append(sphere)
-        
+            self.objs[id] = sphere
+
         del view_cells
 
-        axisX = Axis(vec3(0), X)
-        axisY = Axis(vec3(0), Y)
-        axisZ = Axis(vec3(0), Z)
-        list_objs.append(axisX)
-        list_objs.append(axisY)
-        list_objs.append(axisZ)
+        dirs = [X, Y, Z]
+        for dir in dirs:
+            axis = Axis(vec3(0), dir)
+            id = self.config.getKey()
+            self.objs[id] = axis
 
         if time > 0:
             if not self._check_accumulate():
@@ -504,14 +601,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 t = self.maxTime.value()
                 t = t if t%2 == 0 else t-1
                 cube = Box(center=vec3(0), width=t)
-            list_objs.append(cube)
-
-        self.objs = {}
-        for i in range(len(list_objs)):
-            self.objs[self.config.getKey()] = list_objs[i]
-
-        del list_objs
-        gc.collect(2)
+            id = self.config.getKey()
+            self.objs[id] = cube
 
         if make_view:
             self.make_view(time)
@@ -539,11 +630,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
             self.histogram.set_time(time, self.maxTime.value(), self._check_accumulate())
-            if self.view_histogram:
-                self.histogram.show()
+            self.histogram.show()
 
         else:
             print('continue setting number...')
+            self.deselect_all()
             self.view.scene.displays.clear()
             self.view.scene.add(self.objs)
             self.view.scene.render(self.view)
@@ -552,14 +643,16 @@ class MainWindow(QtWidgets.QMainWindow):
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
             self.histogram.set_time(time, self.maxTime.value(), self._check_accumulate())
-            if self.view_histogram:
-                self.histogram.show()
+            self.histogram.show()
 
         del self.objs
         self.objs = {}
         gc.collect()
-        self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
-        
+        if self.num and self._check_accumulate():
+            self.setStatus(f'center: {100.0 * self.stat_center / self.num:0.2f}%, other: {100.0 * self.stat_other / self.num:0.2f}%')
+        else:
+            self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
+
     def fit_histogram(self):
         if not self.histogram or not self.view_histogram:
             return

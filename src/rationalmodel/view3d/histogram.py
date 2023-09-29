@@ -211,6 +211,9 @@ class Histogram(QtWidgets.QWidget):
         self.time = time
         self.max_time =max_time
         self.accumulate = accumulate
+        self.display_all()
+
+    def display_all(self):
         self._make_items()
         if self.change_flag:
             self.scene.fit()
@@ -234,13 +237,14 @@ class Histogram(QtWidgets.QWidget):
             dict_objs[num] += 1
             count += 1
 
-        print(f'hist: ------- time: {self.time}, count: {count}, max: {max}, len: {len(dict_objs)}')
-
         self.scene.clear()
         for num in dict_objs.keys():
             alpha = float(num) / float(max)
             pos = float(num)
-            color = self.color.getColor(alpha)
+            if self.parent() and self.parent().is_selected(num):
+                color = vec3(255, 255, 255)
+            else:
+                color = self.color.getColor(alpha)
             height = float(dict_objs[num])
             self.scene.add(pos, height, color)
 
@@ -248,10 +252,10 @@ class Histogram(QtWidgets.QWidget):
         del dict_objs
         gc.collect()
 
-    def prepare_save(self, ctx=None):
+    def prepare_save_image(self, ctx=None):
         self.old_time = self.time
 
-    def save_image(self, time):
+    def get_save_image(self, time):
         self.time = time
         self._make_items()
         if self.accumulate:
@@ -259,7 +263,7 @@ class Histogram(QtWidgets.QWidget):
         img = self.scene.render()
         return img.convert('RGBA')
 
-    def end_save(self):
+    def end_save_image(self):
         self.time = self.old_time
         self._make_items()
 

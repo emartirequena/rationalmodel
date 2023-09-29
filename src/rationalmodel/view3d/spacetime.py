@@ -1,7 +1,10 @@
+import os
 from multiprocessing import Pool, cpu_count, Pipe
+import json
 import gc
 
 from rationals import Rational, c
+from config import Config
 
 
 spacetime = None
@@ -69,6 +72,33 @@ class Space(object):
 	def add(self, x, y=0.0, z=0.0):
 		self.getCell(x, y, z).add()
 
+	def save_stats(self, fname):
+		objs = {}
+		view_cells = list(filter(lambda x: x.count != 0, self.cells))
+		for cell in view_cells:
+			key = cell.count
+			if key not in objs: objs[key] = {
+				'count': 0,
+				'percent': 0.0
+			}
+			objs[key]['count'] += 1
+		total = 0.0
+		for key in objs.keys():
+			obj = objs[key]
+			total += float(obj['count'] * key)
+		for key in objs.keys():
+			obj = objs[key]
+			obj['percent'] = 100. * float(key * obj['count']) / float(total)
+
+		objs = dict(sorted(zip(objs.keys(), objs.values()), key=lambda x: int(x[0])))
+
+		with open(fname, 'wt') as fp:
+			json.dump(objs, fp, indent=2)
+
+		del view_cells
+		del objs
+		gc.collect()
+
 class Spaces:
 	def __init__(self, T, max, dim=1) -> None:
 		self.T = T
@@ -108,6 +138,9 @@ class Spaces:
 			else:
 				return self.accumulates_odd
 
+	def save_stats(self, t, fname, accumulate=False):
+		space = self.getSpace(t, accumulate=accumulate)
+		space.save_stats(fname)
 
 def create_rational(args):
 	m, n, dim = args
@@ -214,10 +247,16 @@ class SpaceTime(object):
 		for r in self.rationalSet:
 			self.add_rational(r, t, x, y, z, accumulate, is_special)
 
+	def save_stats(self, t, fname, accumulate=False):
+		self.spaces.save_stats(t, fname, accumulate=accumulate)
+
+
 if __name__ == '__main__':
 	print('Creating spacetime...')
 	spacetime = SpaceTime(20, 40, 3)
 	print('Setting rational set of 25...')
 	spacetime.setRationalSet(25)
 	print('Adding rational set...')
-	spacetime.addRationalSet()
+	spacetime.addRationalSet(is_special=True, accumulate=True)
+	config = Config()
+	spacetime.save_stats(40, os.path.join(config.get('image_path'), 'test.json'), accumulate=True)
