@@ -510,6 +510,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         init = time.time()
+        app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
         if self.spacetime is not None:
             print('------- del spacetime...')
@@ -539,6 +540,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         end = time.time()
         print(f'------- compute time = {int(end-init)}')
+        app.restoreOverrideCursor()
         
     def make_objects(self, time:int=0, make_view:bool=True):
         if not self.spacetime:
