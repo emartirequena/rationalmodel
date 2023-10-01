@@ -9,7 +9,7 @@ from config import Config
 from color import ColorLine
 from utils import lerp
 
-epsilon = 0.1
+epsilon = 5.
 
 class Item:
     def __init__(self, x: int, height: int, color: vec3, count: int) -> None:
@@ -22,8 +22,7 @@ class Item:
             int(255 * color.z)
         )
 
-    def check_position(self, x, scl):
-        eps = epsilon * scl
+    def check_position(self, x, eps):
         if self.x - eps <= x <= self.x + eps:
             return True
         return False
@@ -136,8 +135,10 @@ class Scene:
     
     def itemat(self, x):
         x = x / self.scl - self.ox
+        eps = epsilon / self.scl
+        print(f'itemat x: {x:0.1f}, eps: {eps:0.1f}')
         for item in self.items:
-            if item.check_position(x, self.scl):
+            if item.check_position(x, eps):
                 return item
         return None
 
@@ -299,7 +300,7 @@ class Histogram(QtWidgets.QWidget):
             if item:
                 self.parent().select_cells(item.count)
         self.moving = False
-        return super().mouseReleaseEvent(a0)
+        a0.accept()
 
     def wheelEvent(self, a0: QWheelEvent) -> None:
         pos = float(a0.pos().x())
