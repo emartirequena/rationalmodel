@@ -9,7 +9,7 @@ from config import Config
 from color import ColorLine
 from utils import lerp
 
-epsilon = 0.5
+epsilon = 0.1
 
 class Item:
     def __init__(self, x: int, height: int, color: vec3, count: int) -> None:
@@ -22,8 +22,9 @@ class Item:
             int(255 * color.z)
         )
 
-    def check_position(self, x, y):
-        if self.x - epsilon <= x <= self.x + epsilon:
+    def check_position(self, x, scl):
+        eps = epsilon * scl
+        if self.x - eps <= x <= self.x + eps:
             return True
         return False
 
@@ -133,12 +134,10 @@ class Scene:
         draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
         return img
     
-    def itemat(self, x, y):
+    def itemat(self, x):
         x = x / self.scl - self.ox
-        _, y_max = self._get_y_step_max(10)
-        y = np.power((self.height - y) / y_max, self.y_factor)
         for item in self.items:
-            if item.check_position(x, y):
+            if item.check_position(x, self.scl):
                 return item
         return None
 
@@ -296,7 +295,7 @@ class Histogram(QtWidgets.QWidget):
 
     def mouseReleaseEvent(self, a0: QMouseEvent) -> None:
         if not self.moving:
-            item = self.scene.itemat(a0.pos().x(), a0.pos().y())
+            item = self.scene.itemat(a0.pos().x())
             if item:
                 self.parent().select_cells(item.count)
         self.moving = False
