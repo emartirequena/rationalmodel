@@ -9,16 +9,23 @@ from config import Config
 from color import ColorLine
 from utils import lerp
 
+epsilon = 0.5
 
 class Item:
-    def __init__(self, x: int, height: int, color: vec3) -> None:
+    def __init__(self, x: int, height: int, color: vec3, count: int) -> None:
         self.x = x
         self.height = height
+        self.count = count
         self.color = (
             int(255 * color.x), 
             int(255 * color.y), 
             int(255 * color.z)
         )
+
+    def check_position(self, x, y):
+        if self.x - epsilon <= x <= self.x + epsilon:
+            return True
+        return False
 
 
 class Scene:
@@ -38,8 +45,8 @@ class Scene:
         self.max_x = 0.
         self.max_h = max_h
 
-    def add(self, x: int, height: int, color: vec3):
-        self.items.append(Item(x, height, color))
+    def add(self, x: int, height: int, color: vec3, count: int):
+        self.items.append(Item(x, height, color, count))
         if x > self.max_x: self.max_x = x
 
     def scale(self, x: float, step: float):
@@ -125,6 +132,15 @@ class Scene:
 
         draw.rectangle((0, 0, self.width-1, self.height-1), None, (255, 255, 255), 1)
         return img
+    
+    def itemat(self, x, y):
+        x = x / self.scl - self.ox
+        _, y_max = self._get_y_step_max(10)
+        y = np.power((self.height - y) / y_max, self.y_factor)
+        for item in self.items:
+            if item.check_position(x, y):
+                return item
+        return None
 
     @staticmethod
     def _pil2pixmap(img):
@@ -150,6 +166,7 @@ class Histogram(QtWidgets.QWidget):
         self.time = 0
         self.number = 0
         self.accumulate = False
+        self.moving = False
         if not parent:
             self.config = Config()
         else:
@@ -243,7 +260,7 @@ class Histogram(QtWidgets.QWidget):
             else:
                 color = self.color.getColor(alpha)
             height = float(dict_objs[count])
-            self.scene.add(pos, height, color)
+            self.scene.add(pos, height, color, count)
 
         del view_cells
         del dict_objs
@@ -266,14 +283,24 @@ class Histogram(QtWidgets.QWidget):
 
     def mousePressEvent(self, a0: QMouseEvent) -> None:
         self.old_pos = float(a0.pos().x())
+        self.moving = False
         a0.accept()
 
     def mouseMoveEvent(self, a0: QMouseEvent) -> None:
+        self.moving = True
         pos = float(a0.pos().x())
         self.scene.translate(float(pos - self.old_pos))
         self.old_pos = pos
         self.reset()
         a0.accept()
+
+    def mouseReleaseEvent(self, a0: QMouseEvent) -> None:
+        if not self.moving:
+            item = self.scene.itemat(a0.pos().x(), a0.pos().y())
+            if item:
+                self.parent().select_cells(item.count)
+        self.moving = False
+        return super().mouseReleaseEvent(a0)
 
     def wheelEvent(self, a0: QWheelEvent) -> None:
         pos = float(a0.pos().x())

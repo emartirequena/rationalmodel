@@ -68,6 +68,9 @@ class Space(object):
 		nz = c * self.t - z if self.dim > 2 else 0.0
 		n = nx + (self.t + 1) * (ny + (self.t + 1) * nz)
 		return self.cells[int(n)]
+	
+	def getCells(self):
+		return list(filter(lambda x: x.count != 0, self.cells))
 
 	def add(self, x, y=0.0, z=0.0):
 		self.getCell(x, y, z).add()
@@ -128,7 +131,16 @@ class Spaces:
 				return self.accumulates_even.getCell(x, y, z)
 			else:
 				return self.accumulates_odd.getCell(x, y, z)
-	
+			
+	def getCells(self, t, accumulate=False):
+		if not accumulate:
+			return self.spaces[t].getCells()
+		else:
+			if t%2 == 0:
+				return self.accumulates_even.getCells()
+			else:
+				return self.accumulates_odd.getCells()
+
 	def getSpace(self, t, accumulate=False):
 		if not accumulate:
 			return self.spaces[t]
@@ -182,6 +194,9 @@ class SpaceTime(object):
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		return self.spaces.getCell(t, x, y, z, accumulate)
+	
+	def getCells(self, t, accumulate=False):
+		return self.spaces.getCells(t, accumulate)
 	
 	def getSpace(self, t, accumulate=False):
 		return self.spaces.getSpace(t, accumulate)

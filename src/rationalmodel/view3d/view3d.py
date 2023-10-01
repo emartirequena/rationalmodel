@@ -38,7 +38,6 @@ class MainView(rendering.View):
             cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=self.mainWindow._check_accumulate())
             count = cell.count
             self.mainWindow.select_cells(count)
-            self.mainWindow.print_selection()
             return True
         return False
 
@@ -223,6 +222,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionDeselectAll.triggered.connect(self.deselect_all)
         self.menuSelection.addAction(self.actionDeselectAll)
         
+        self.actionInvertSelection = QtWidgets.QAction('Invert Selection', self)
+        self.actionInvertSelection.setShortcut('Shift+A')
+        self.actionInvertSelection.triggered.connect(self.invert_selection)
+        self.menuSelection.addAction(self.actionInvertSelection)
+
         self.menu.addMenu(self.menuSelection)
 
         self.menuTime = QtWidgets.QMenu('Time')
@@ -435,15 +439,48 @@ class MainWindow(QtWidgets.QMainWindow):
                 disp.selected = state if state is not None else not disp.selected
 
     def select_cells(self, count):
+        if not count:
+            return
         if count not in self.selected:
             self.selected[count] = self.cell_ids[count]
             self._switch_display(count, True)
         else:
             self._switch_display(count, False)
             del self.selected[count]
-        self.view.update()
-        self.histogram.display_all()
-        self.histogram.update()
+        self.refresh_selection()
+
+    def select_all(self):
+        for count in self.cell_ids:
+            if count not in self.selected:
+                self.selected[count] = self.cell_ids[count]
+                self._switch_display(count, True)
+        self.refresh_selection()
+
+    def deselect_all(self):
+        for count in self.selected:
+            self._switch_display(count, False)
+        self.selected = {}
+        gc.collect()       
+        self.refresh_selection()
+
+    def invert_selection(self):
+        not_selected = {}
+        for count in self.cell_ids:
+            if count in self.selected:
+                self._switch_display(count, False)
+            else:
+                not_selected[count] = self.cell_ids[count]
+                self._switch_display(count, True)
+        self.selected = not_selected    
+        self.refresh_selection()
+
+    def refresh_selection(self):
+        self.print_selection()
+        if self.view:
+            self.view.update()
+        if self.histogram:
+            self.histogram.display_all()
+            self.histogram.update()
 
     def print_selection(self):
         selected_cells, selected_paths = self.get_selected_paths()
@@ -455,30 +492,6 @@ class MainWindow(QtWidgets.QMainWindow):
         text = f'Selected cells: {selected_cells}, num paths: {selected_paths} / {max}, percent: {percent:.2f}%'
         self.setStatus(text)
     
-    def select_all(self):
-        for count in self.cell_ids:
-            if count not in self.selected:
-                self.selected[count] = self.cell_ids[count]
-                self._switch_display(count, True)
-        self.print_selection()
-        if self.view:
-            self.view.update()
-        if self.histogram:
-            self.histogram.display_all()
-            self.histogram.update()
-
-    def deselect_all(self):
-        for count in self.selected:
-            self._switch_display(count, False)
-        self.selected = {}
-        gc.collect()       
-        self.print_selection()
-        if self.view:
-            self.view.update()
-        if self.histogram:
-            self.histogram.display_all()
-            self.histogram.update()
-
     def is_selected(self, count):
         if count in self.selected:
             return True
