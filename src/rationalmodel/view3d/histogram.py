@@ -10,6 +10,8 @@ from color import ColorLine
 from utils import lerp
 
 epsilon = 5.
+colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
+
 
 class Item:
     def __init__(self, x: int, height: int, color: vec3, count: int) -> None:
@@ -39,6 +41,7 @@ class Scene:
         self.ox: float = width / 2
         self.scl: float = 1.
         self.items: list[Item] = []
+        self.select_area = None
 
     def clear(self, max_h=1.):
         self.items = []
@@ -72,6 +75,12 @@ class Scene:
     def translate(self, dist: float):
         self.ox += dist / self.scl
 
+    def screen2world(self, xscr: int) -> float:
+        return xscr / self.scl - self.ox
+    
+    def world2screen(self, xwrld: float) -> int:
+        return int((xwrld + self.ox) * self.scl)
+
     @staticmethod
     def _loga(a, x):
         return np.log(x) / np.log(a)
@@ -92,7 +101,6 @@ class Scene:
         return x_step, x_max
 
     def _render_grid(self, draw):
-        colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
         x_base = 10
         y_base = 5
 
@@ -123,6 +131,9 @@ class Scene:
         img = Image.new('RGB', (self.width, self.height), (0, 0, 0))
         draw = ImageDraw.Draw(img)
 
+        if self.select_area:
+            self.select_area.render(draw)
+
         self._render_grid(draw)
         _, y_max = self._get_y_step_max(10)
         for item in self.items:
@@ -134,12 +145,15 @@ class Scene:
         return img
     
     def itemat(self, x):
-        x = x / self.scl - self.ox
+        x = self.screen2world(x)
         eps = epsilon / self.scl
-        print(f'itemat x: {x:0.1f}, eps: {eps:0.1f}')
+        print(f'eps: {eps:0.2f}, x: {x:0.2f}')
         for item in self.items:
-            if item.check_position(x, eps):
+            if item.x - eps <= x <= item.x + eps:
+                print(f'item.x: {item.x:0.2f}')
                 return item
+            # if item.check_position(x, eps):
+            #     return item
         return None
 
     @staticmethod
@@ -157,6 +171,49 @@ class Scene:
         qimg = QtGui.QImage(data, img.size[0], img.size[1], QtGui.QImage.Format_ARGB32)
         pixmap = QtGui.QPixmap.fromImage(qimg)
         return pixmap
+    
+    def init_select_area(self, begin: int):
+        self.select_area = SelectArea(begin, self)
+
+    def move_select_area(self, end: int):
+        if self.select_area:
+            self.select_area.set_end(end)
+
+    def end_select_area(self):
+        if not self.select_area:
+            return []
+        selected = []
+        for item in self.items:
+            if self.select_area.inside(item.x):
+                selected.append(item)
+        self.select_area = None
+        return selected
+
+
+class SelectArea:
+    def __init__(self, begin: int, scene: Scene):
+        self.begin = begin
+        self.end = begin
+        self.scene = scene
+
+    def set_end(self, end: int):
+        self.end = end
+
+    def render(self, draw: ImageDraw.Draw):
+        colors = [(50, 50, 50), (50, 50, 200)]
+        if self.begin == self.end:
+            return
+        if self.end < self.begin:
+            t = self.end
+            self.end = self.begin
+            self.begin = t
+        draw.rectangle((self.begin, 0, self.end, self.scene.height), colors[0], colors[1], 1)
+
+    def inside(self, xwrld: float):
+        x = self.scene.world2screen(xwrld)
+        if self.begin <= x <= self.end:
+            return True
+        return False
 
 
 class Histogram(QtWidgets.QWidget):
@@ -282,24 +339,38 @@ class Histogram(QtWidgets.QWidget):
         self._make_items()
 
     def mousePressEvent(self, a0: QMouseEvent) -> None:
-        self.old_pos = float(a0.pos().x())
-        self.moving = False
+        if a0.modifiers() & QtCore.Qt.ShiftModifier:
+            self.scene.init_select_area(a0.pos().x())
+        else:
+            self.old_pos = float(a0.pos().x())
+            self.scene.select_area = None
+            self.moving = False
         a0.accept()
 
     def mouseMoveEvent(self, a0: QMouseEvent) -> None:
-        self.moving = True
-        pos = float(a0.pos().x())
-        self.scene.translate(float(pos - self.old_pos))
-        self.old_pos = pos
+        if a0.modifiers() & QtCore.Qt.ShiftModifier: 
+            self.scene.move_select_area(a0.pos().x())
+        else:
+            self.moving = True
+            pos = float(a0.pos().x())
+            self.scene.translate(float(pos - self.old_pos))
+            self.old_pos = pos
         self.reset()
         a0.accept()
 
     def mouseReleaseEvent(self, a0: QMouseEvent) -> None:
-        if not self.moving:
-            item = self.scene.itemat(a0.pos().x())
-            if item:
+        if a0.modifiers() & QtCore.Qt.ShiftModifier: 
+            selected_items = self.scene.end_select_area()
+            for item in selected_items:
                 self.parent().select_cells(item.count)
-        self.moving = False
+            self.parent().refresh_selection()
+        else:
+            if not self.moving:
+                item = self.scene.itemat(a0.pos().x())
+                if item:
+                    self.parent().select_cells(item.count)
+                    self.parent().refresh_selection()
+            self.moving = False
         a0.accept()
 
     def wheelEvent(self, a0: QWheelEvent) -> None:
@@ -309,23 +380,23 @@ class Histogram(QtWidgets.QWidget):
         self.reset()
         a0.accept()
 
-    def keyPressEvent(self, a0: QKeyEvent) -> None:
-        print('hist: ------- key press event...')
-        if a0.key() == QtCore.Qt.Key.Key_F:
-            self.scene.fit()
-            self.reset()
-            a0.accept()
-            return
-        if not self.parent():
-            if a0.key() == QtCore.Qt.Key.Key_Left and self.time > 0:
-                self.set_time(self.time - 1)
-                a0.accept()
-                return
-            elif a0.key() == QtCore.Qt.Key.Key_Right and self.time < 30:
-                self.set_time(self.time + 1)
-                a0.accept()
-                return
-            return super().keyPressEvent(a0)
+    # def keyPressEvent(self, a0: QKeyEvent) -> None:
+    #     print('hist: ------- key press event...')
+    #     if a0.key() == QtCore.Qt.Key.Key_F:
+    #         self.scene.fit()
+    #         self.reset()
+    #         a0.accept()
+    #         return
+    #     if not self.parent():
+    #         if a0.key() == QtCore.Qt.Key.Key_Left and self.time > 0:
+    #             self.set_time(self.time - 1)
+    #             a0.accept()
+    #             return
+    #         elif a0.key() == QtCore.Qt.Key.Key_Right and self.time < 30:
+    #             self.set_time(self.time + 1)
+    #             a0.accept()
+    #             return
+    #         return super().keyPressEvent(a0)
 
 
 if __name__ == '__main__':

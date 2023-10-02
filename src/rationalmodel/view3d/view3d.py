@@ -38,6 +38,7 @@ class MainView(rendering.View):
             cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=self.mainWindow._check_accumulate())
             count = cell.count
             self.mainWindow.select_cells(count)
+            self.mainWindow.refresh_selection()
             return True
         return False
 
@@ -447,7 +448,6 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self._switch_display(count, False)
             del self.selected[count]
-        self.refresh_selection()
 
     def select_all(self):
         for count in self.cell_ids:
