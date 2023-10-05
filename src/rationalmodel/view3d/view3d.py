@@ -7,13 +7,13 @@ from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
 
-from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box
+from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 
 from spacetime import SpaceTime
 from rationals import c
-from utils import getDivisorsAndFactors, divisors, make_video
+from utils import getDivisorsAndFactors, divisors, make_video, timing
 from config import Config
 from color import ColorLine
 from renderView import RenderView
@@ -25,9 +25,9 @@ opengl_version = (3,3)
 
 
 class MainView(rendering.View):
-    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene: rendering.Scene, parent: QtWidgets.QWidget=None):
+    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene: rendering.Scene, projection: rendering.Perspective | rendering.Orthographic, parent: QtWidgets.QWidget=None):
         self.mainWindow = mainWindow
-        super().__init__(scene, parent=parent)
+        super().__init__(scene, projection=projection, parent=parent)
 
     def mouseClick(self, evt):
         obj = self.itemat(QtCore.QPoint(evt.x(), evt.y()))
@@ -35,14 +35,23 @@ class MainView(rendering.View):
             center = self.scene.item(obj).box.center
             t = self.mainWindow.timeWidget.value()
             spacetime = self.mainWindow.spacetime
-            cell = spacetime.getCell(t, center.x, center.y, center.z, accumulate=self.mainWindow._check_accumulate())
-            count = cell.count
-            self.mainWindow.select_cells(count)
-            self.mainWindow.refresh_selection()
+            if spacetime:
+                if self.mainWindow.dim == 2:
+                    x = center.x
+                    y = center.z
+                    z = 0.0
+                else:
+                    x = center.x
+                    y = center.y
+                    z = center.z
+                cell = spacetime.getCell(t, x, y, z, accumulate=self.mainWindow._check_accumulate())
+                count = cell.count
+                self.mainWindow.select_cells(count)
+                self.mainWindow.refresh_selection()
             return True
         return False
 
-    def control(self, key, evt):
+    def control(self, _, evt):
         if evt.type() == 3:
             return self.mouseClick(evt)
         return False
@@ -52,11 +61,13 @@ class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
         self.setUpUi()
+        self.dim = 3
         self.count = 0
         self.objs = {}
         self.cell_ids = {}
         self.selected = {}
         self.view = None
+        self.first_number_set = False
         self.period_changed = False
         self.histogram = None
         self.view_histogram = True
@@ -67,7 +78,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.config = Config()
         self.color = None
         self.loadConfigColors()
-        self.make_view(0)
+        self._clear_parameters()
         self.showMaximized()
 
     def loadConfigColors(self):
@@ -93,7 +104,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         self.leftLayout.addLayout(self.viewLayout, 10)
         self.leftLayout.addLayout(self.timeLayout, 1)
-        
+
         self.timeWidget = QtWidgets.QSlider(Qt.Horizontal)
         self.timeWidget.setMinimum(0)
         self.timeWidget.setMaximum(100)
@@ -108,50 +119,70 @@ class MainWindow(QtWidgets.QMainWindow):
         self.time.setMaximum(10000)
         self.time.valueChanged.connect(self.timeWidget.setValue)
         self.timeWidget.valueChanged.connect(self.time.setValue)
-        self.timeLayout.addWidget(self.time)
         self.time.setValue(0)
+        self.timeLayout.addWidget(self.time)
 
         self.gridLayout = QtWidgets.QGridLayout()
-        
+
+        self.dimLabel = QtWidgets.QLabel('Dimension')
+        self.gridLayout.addWidget(self.dimLabel, 0, 0)
+        self.dimLayout = QtWidgets.QHBoxLayout()
+        self.button1D = QtWidgets.QPushButton('1D', self)
+        self.button1D.setMaximumWidth(50)
+        self.button1D.setMinimumHeight(20)
+        self.button1D.clicked.connect(self.set1D)
+        self.dimLayout.addWidget(self.button1D)
+        self.button2D = QtWidgets.QPushButton('2D', self)
+        self.button2D.setMaximumWidth(50)
+        self.button2D.setMinimumHeight(20)
+        self.button2D.clicked.connect(self.set2D)
+        self.dimLayout.addWidget(self.button2D)
+        self.button3D = QtWidgets.QPushButton('3D', self)
+        self.button3D.setMaximumWidth(50)
+        self.button3D.setMinimumHeight(20)
+        self.button3D.clicked.connect(self.set3D)
+        self.dimLayout.addWidget(self.button3D)
+        self.gridLayout.addLayout(self.dimLayout, 0, 1)
+
         self.label1 = QtWidgets.QLabel('Period')
-        self.gridLayout.addWidget(self.label1, 0, 0)
+        self.gridLayout.addWidget(self.label1, 1, 0)
         self.period = QtWidgets.QSpinBox(self)
         self.period.setMinimum(1)
         self.period.setMaximum(100)
         self.period.valueChanged.connect(self.get_period_factors)
-        self.gridLayout.addWidget(self.period, 0, 1)
+        self.gridLayout.addWidget(self.period, 1, 1)
 
         self.label2 = QtWidgets.QLabel('Max Time')
-        self.gridLayout.addWidget(self.label2, 1, 0)
+        self.gridLayout.addWidget(self.label2, 2, 0)
         self.maxTime = QtWidgets.QSpinBox(self)
         self.maxTime.valueChanged.connect(self.timeWidget.setMaximum)
         self.maxTime.valueChanged.connect(self.timeWidget.setValue)
         self.maxTime.setMinimum(0)
         self.maxTime.setMaximum(10000)
-        self.gridLayout.addWidget(self.maxTime, 1, 1)
+        self.gridLayout.addWidget(self.maxTime, 2, 1)
 
         self.label3 = QtWidgets.QLabel('Number')
-        self.gridLayout.addWidget(self.label3, 2, 0)
+        self.gridLayout.addWidget(self.label3, 3, 0)
         self.number = QtWidgets.QDoubleSpinBox(self)
         self.number.setMinimum(0)
         self.number.setDecimals(0)
         self.number.setMaximum(18446744073709551615)
         self.number.setEnabled(False)
-        self.gridLayout.addWidget(self.number, 2, 1)
+        self.gridLayout.addWidget(self.number, 3, 1)
 
         self.label4 = QtWidgets.QLabel('Factors')
-        self.gridLayout.addWidget(self.label4, 3, 0)
+        self.gridLayout.addWidget(self.label4, 4, 0)
         self.factorsLabel = QtWidgets.QLabel()
         self.factorsLabel.setWordWrap(True)
-        self.gridLayout.addWidget(self.factorsLabel, 3, 1)
+        self.gridLayout.addWidget(self.factorsLabel, 4, 1)
 
         self.factorsLayout = QtWidgets.QVBoxLayout()
-        self.gridLayout.addLayout(self.factorsLayout, 4, 0)
+        self.gridLayout.addLayout(self.factorsLayout, 5, 0)
 
         self.label4 = QtWidgets.QLabel('Divisors')
-        self.gridLayout.addWidget(self.label4, 5, 0)
+        self.gridLayout.addWidget(self.label4, 6, 0)
         self.label_num_divisors = QtWidgets.QLabel('')
-        self.gridLayout.addWidget(self.label_num_divisors, 5, 1)
+        self.gridLayout.addWidget(self.label_num_divisors, 6, 1)
 
         self.rightLayout.addLayout(self.gridLayout)
 
@@ -266,6 +297,66 @@ class MainWindow(QtWidgets.QMainWindow):
     def _check_accumulate(self):
         return bool(self.accumulate.checkState())
 
+    def _clear_view(self):
+        self.first_number_set = False
+        if self.view:
+            if self.dim < 3:
+                self.view.projection = rendering.Orthographic()
+            else:
+                self.view.projection = rendering.Perspective()
+            self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
+            self.view.scene.displays.clear()
+            self.view.scene.add({})
+            self.view.center()
+            self.view.adjust()
+            self.view.update()
+            if self.histogram:
+                self.histogram.clear()
+        else:
+            self.make_view(0)
+        self.objs = {}
+        self.cell_ids = {}
+        self.selected = {}
+
+    def _clear_parameters(self):
+        self.period.setValue(1)
+        self.period_changed = False
+        self.maxTime.setValue(0)
+        self.number.setValue(0)
+        self.divisors.clear()
+        self.factorsLabel.setText('')
+        self.label_num_divisors.setText('')
+        if self.histogram: 
+            self.histogram.set_spacetime(None)
+        pressed     = 'QPushButton {background-color: bisque;      color: red;    border-width: 1px; border-radius: 4px; border-style: outset; border-color: gray;}'
+        not_pressed = 'QPushButton {background-color: floralwhite; color: black;  border-width: 1px; border-radius: 4px; border-style: outset; border-color: gray;}' \
+                      'QPushButton:hover {background-color: lightgray; border-color: blue;}'
+        if self.dim == 1:
+            self.button1D.setStyleSheet(pressed)
+            self.button2D.setStyleSheet(not_pressed)
+            self.button3D.setStyleSheet(not_pressed)
+        elif self.dim == 2:
+            self.button1D.setStyleSheet(not_pressed)
+            self.button2D.setStyleSheet(pressed)
+            self.button3D.setStyleSheet(not_pressed)
+        elif self.dim == 3:
+            self.button1D.setStyleSheet(not_pressed)
+            self.button2D.setStyleSheet(not_pressed)
+            self.button3D.setStyleSheet(pressed)
+        self._clear_view()
+
+    def set1D(self):
+        self.dim = 1
+        self._clear_parameters()
+
+    def set2D(self):
+        self.dim = 2
+        self._clear_parameters()
+
+    def set3D(self):
+        self.dim = 3
+        self._clear_parameters()
+
     def setTimeInit(self):
         print('------- set init time')
         self.timeWidget.setValue(0)
@@ -292,12 +383,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.statusBar.show()
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
+    def _getDimStr(self):
+        if self.dim == 1: return '1D'
+        elif self.dim == 2: return '2D'
+        else: return '3D'
+
     def _makePath(self, period, number):
         if self._check_accumulate():
-            path = os.path.join(self.config.get('image_path'), f'P{period:02d}', 'Accumulate')
+            path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate')
         else:
             factors = self.get_output_factors(number)
-            path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', f'N{number:d}_F{factors}')
+            path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -328,7 +424,7 @@ class MainWindow(QtWidgets.QMainWindow):
         view = RenderView(scene, projection=projection, navigation=navigation)
         view.resize((image_resx, image_resy))
 
-        self.histogram.prepare_save_image(ctx=scene.ctx)
+        self.histogram.prepare_save_image()
 
         for time in range(init_time, end_time + 1):
             scene.displays.clear()
@@ -336,7 +432,7 @@ class MainWindow(QtWidgets.QMainWindow):
             scene.add(objs)
             img = view.render()
             
-            file_name = f'P{period:02d}_N{number}_F{factors}.{time:04d}.png'
+            file_name = f'{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
                 hist_img = self.histogram.get_save_image(time)
@@ -367,12 +463,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if init_time != end_time:
 
             if not self._check_accumulate():
-                in_sequence_path = os.path.join(path, f'P{period:02d}_N{number}_F{factors}.%04d.png')
-                out_video_path = os.path.join(path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_path = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
+                main_video_path = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
                 self.setStatus('Making main sequence video...')
                 result = make_video(
                     ffmpeg_path, 
-                    in_sequence_path, out_video_path, 
+                    in_sequence_path, main_video_path, 
                     video_codec, video_format, 
                     frame_rate, bit_rate, 
                     image_resx, image_resy
@@ -381,12 +477,12 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.setStatus('ffmepg not found... (check config.json file specification)')
                     return
 
-                in_sequence_path = os.path.join(path, f'Hist_P{period:02d}_N{number}_F{factors}.%04d.png')
-                out_video_path = os.path.join(path, f'Hist_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_path = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
+                hist_video_path = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
                 self.setStatus('Making histogram video...')
                 make_video(
                     ffmpeg_path, 
-                    in_sequence_path, out_video_path, 
+                    in_sequence_path, hist_video_path, 
                     video_codec, video_format, 
                     frame_rate, bit_rate, 
                     histogram_resx, histogram_resy
@@ -395,16 +491,16 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.setStatus('Copying video...')
                 if not os.path.exists(video_path):
                     os.makedirs(video_path)
-                dest_video_path = os.path.join(video_path, f'P{period:02d}_N{number:d}_F{factors}.{video_format}')
-                shutil.copyfile(out_video_path, dest_video_path)
+                dest_video_path = os.path.join(video_path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                shutil.copyfile(main_video_path, dest_video_path)
 
             else:
-                in_sequence_path = os.path.join(path, f'Accum_P{period:02d}_N{number}_F{factors}.%04d.png')
-                out_video_path = os.path.join(path, f'Accum_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_path = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
+                main_video_path = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
                 self.setStatus('Making main sequence video...')
                 result = make_video(
                     ffmpeg_path, 
-                    in_sequence_path, out_video_path, 
+                    in_sequence_path, main_video_path, 
                     video_codec, video_format, 
                     frame_rate, bit_rate, 
                     image_resx, image_resy
@@ -416,8 +512,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.setStatus('Copying video...')
                 if not os.path.exists(video_path):
                     os.makedirs(video_path)
-                dest_video_path = os.path.join(video_path, f'Accum_P{period:02d}_N{number:d}_F{factors}.{video_format}')
-                shutil.copyfile(out_video_path, dest_video_path)
+                dest_video_path = os.path.join(video_path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                shutil.copyfile(main_video_path, dest_video_path)
 
             self.setStatus('Videos saved...')
 
@@ -432,9 +528,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
-            disp = self.view.scene.item([0])[0].displays[id]
+            if len(list(self.view.scene.item([0]))) == 1:
+                disp = self.view.scene.item([0])[0].displays[id]
+            else:
+                disp = self.view.scene.item([0])[id]
             if type(disp).__name__ in ('SolidDisplay', 'WebDisplay'):
-                disp.vertices.selectsub(0)
+                if self.dim == 2:
+                    disp.vertices.selectsub(1)
+                else:
+                    disp.vertices.selectsub(0)
                 disp.selected = state if state is not None else not any(disp.vertices.flags & 0x1)
             else:
                 disp.selected = state if state is not None else not disp.selected
@@ -449,14 +551,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self._switch_display(count, False)
             del self.selected[count]
 
-    def select_all(self):
+    @timing
+    def select_all(self, nope=False):
         for count in self.cell_ids:
             if count not in self.selected:
                 self.selected[count] = self.cell_ids[count]
                 self._switch_display(count, True)
         self.refresh_selection()
 
-    def deselect_all(self):
+    @timing
+    def deselect_all(self, nope=False):
+        if not self.selected:
+            return
         for count in self.selected:
             self._switch_display(count, False)
         self.selected = {}
@@ -505,11 +611,11 @@ class MainWindow(QtWidgets.QMainWindow):
             total_paths += count * len(self.selected[count])
         return num_cells, total_paths
 
-    def compute(self):
+    @timing
+    def compute(self, nada=False):
         if not int(self.number.value()):
             return
 
-        init = time.time()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
         if self.spacetime is not None:
@@ -523,7 +629,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.deselect_all()
 
         self.setStatus('Creating incremental spacetime...')
-        self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=3)
+        self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=self.dim)
 
         self.setStatus(f'Setting rational set for number: {int(self.number.value())} ...')
         self.spacetime.setRationalSet(int(self.number.value()))
@@ -538,28 +644,23 @@ class MainWindow(QtWidgets.QMainWindow):
         self.make_objects()
         self.period_changed = False
 
-        end = time.time()
-        print(f'------- compute time = {int(end-init)}')
         app.restoreOverrideCursor()
-        
-    def make_objects(self, time:int=0, make_view:bool=True):
+
+    def make_objects(self, frame:int=0, make_view:bool=True):
         if not self.spacetime:
             return
         if self.number.value() == 0:
             return
-        if make_view:
-            time = self.timeWidget.value()
-            self.deselect_all()
-        if time > self.spacetime.len():
+        if frame > self.spacetime.len():
             return
+
+        if make_view:
+            frame = self.timeWidget.value()
+            self.deselect_all()
         
-        space = self.spacetime.getSpace(time, accumulate=self._check_accumulate())
-        view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
+        view_cells = self.spacetime.getCells(frame, accumulate=self._check_accumulate())
+        self.setStatus(f'Drawing time: {frame} ...')
 
-        self.setStatus(f'Drawing time: {time} ...')
-
-        self.stat_center = 0
-        self.stat_other = 0
         self.num = 0
         max = -1
         self.count = 0
@@ -570,11 +671,8 @@ class MainWindow(QtWidgets.QMainWindow):
             if num > 0:
                 self.count += 1
             self.num += num
-            if cell.x == cell.y == cell.z == 0.0:
-                self.stat_center += num
-            else:
-                self.stat_other += num
-        self.setStatus(f'Creating {self.count} spheres at time: {time}')
+        
+        self.setStatus(f'Creating {self.count} objects at time: {frame}')
 
         if not self._check_accumulate():
             rad_factor = self.config.get('rad_factor')
@@ -599,9 +697,16 @@ class MainWindow(QtWidgets.QMainWindow):
             if cell.count not in self.cell_ids:
                 self.cell_ids[cell.count] = []
             self.cell_ids[cell.count].append(id)
-            sphere = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
-            sphere.option(color=self.color.getColor(alpha))
-            self.objs[id] = sphere
+
+            if self.dim == 3:
+                obj = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
+            elif self.dim == 2:
+                obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, 1., cell.y), rad)
+            else:
+                obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha * 10))
+
+            obj.option(color=color)
+            self.objs[id] = obj
 
         del view_cells
 
@@ -611,9 +716,9 @@ class MainWindow(QtWidgets.QMainWindow):
             id = self.config.getKey()
             self.objs[id] = axis
 
-        if time > 0:
+        if frame > 0 and self.dim > 1:
             if not self._check_accumulate():
-                cube = Box(center=vec3(0), width=time)
+                cube = Box(center=vec3(0), width=frame)
             else:
                 t = self.maxTime.value()
                 t = t if t%2 == 0 else t-1
@@ -622,23 +727,29 @@ class MainWindow(QtWidgets.QMainWindow):
             self.objs[id] = cube
 
         if make_view:
-            self.make_view(time)
+            self.make_view(frame)
         else:
             return self.objs
 
-    def make_view(self, time):
+    def make_view(self, frame):
         if not self.view:
             print("view doesn't exists...")
+            if self.dim < 3:
+                projection = rendering.Orthographic()
+            else:
+                projection = rendering.Perspective()
             scene = rendering.Scene(self.objs, options=None)
-            self.view = MainView(self, scene)
+            self.view = MainView(self, scene, projection=projection)
             self.viewLayout.addWidget(self.view)
             self.view.show()
             self.view.center()
             self.view.adjust()
+            self.view.update()
             
-        elif not len(self.view.scene.displays) and self.view.navigation.distance == 1.0:
+        elif not self.first_number_set:
             print('first number set...')
-            self.view.scene.add(self.objs)
+            self.first_number_set = True
+            self.view.scene.update(self.objs)
             self.view.scene.render(self.view)
             self.view.show()
             self.view.center()
@@ -646,8 +757,9 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self._check_accumulate())
-            self.histogram.show()
+            self.histogram.set_time(frame, self._check_accumulate())
+            if self.view_histogram:
+                self.histogram.show()
 
         else:
             print('continue setting number...')
@@ -658,8 +770,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self.view.update()
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(time, self._check_accumulate())
-            self.histogram.show()
+            self.histogram.set_time(frame, self._check_accumulate())
+            if self.view_histogram:
+                self.histogram.show()
 
         del self.objs
         self.objs = {}
@@ -734,7 +847,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.maxTime.setSingleStep(T)
 
     def fillDivisors(self, T: int):
-        a = int(8)
+        a = int(2 ** self.dim)
         b = int(T)
         c = int(2)
         self.numbers = getDivisorsAndFactors(a**b - 1, a)

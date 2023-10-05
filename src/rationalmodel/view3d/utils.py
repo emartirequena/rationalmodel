@@ -1,7 +1,18 @@
 import os
+import time
 from functools import reduce
 from copy import copy
 import subprocess
+
+
+def timing(f):
+    def wrap(*args, **kwargs):
+        time1 = time.time()
+        ret = f(*args, **kwargs)
+        time2 = time.time()
+        print(f'------- {f.__name__:s}() took {(time2-time1):.2f} secs')
+        return ret
+    return wrap
 
 
 def lerp(t, ta, a, tb, b):

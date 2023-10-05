@@ -15,14 +15,14 @@
         {"alpha": 1.0, "color": [1.0, 0.5, 0.2]}
     ],
     "rad_factor": 4.0,
-    "rad_pow": 0.4,
-    "rad_factor_accum": 2.3,
-    "rad_pow_accum": 0.3,
-    "rad_min": 0.02,
+    "rad_pow": 0.5,
+    "rad_factor_accum": 10.0,
+    "rad_pow_accum": 0.26,
+    "rad_min": 0.03,
     "max_faces": 20,
     "faces_pow": 0.2,
-    "histogram_resx": 1000,
-    "histogram_resy": 200,
+    "histogram_resx": 800,
+    "histogram_resy": 150,
     "histogram_max": 10000,
     "histogram_y_factor": 0.75
 }
