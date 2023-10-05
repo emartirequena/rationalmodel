@@ -5,6 +5,7 @@ import gc
 
 from rationals import Rational, c
 from config import Config
+from utils import timing
 
 
 spacetime = None
@@ -64,8 +65,8 @@ class Space(object):
 
 	def getCell(self, x, y=0.0, z=0.0):
 		nx = c * self.t - x
-		ny = c * self.t - y if self.dim > 1 else 0.0
-		nz = c * self.t - z if self.dim > 2 else 0.0
+		ny = (c * self.t - y) if self.dim > 1 else 0.0
+		nz = (c * self.t - z) if self.dim > 2 else 0.0
 		n = nx + (self.t + 1) * (ny + (self.t + 1) * nz)
 		return self.cells[int(n)]
 	
@@ -96,7 +97,7 @@ class Space(object):
 		objs = dict(sorted(zip(objs.keys(), objs.values()), key=lambda x: int(x[0])))
 
 		with open(fname, 'wt') as fp:
-			json.dump(objs, fp, indent=2)
+			json.dump(objs, fp, indent=4)
 
 		del view_cells
 		del objs
@@ -116,8 +117,15 @@ class Spaces:
 
 	def add(self, is_special, t, x, y=0, z=0):
 		self.spaces[t].add(x, y, z)
-		if (x == y == z == t * c or x == y == z == -t * c) and is_special:
-			return
+		if self.dim == 1:
+			if (x == t * c or x == -t * c) and is_special:
+				return
+		elif self.dim == 2:
+			if (x == y == t * c or x == y == -t * c) and is_special:
+				return
+		else:
+			if (x == y == z == t * c or x == y == z == -t * c) and is_special:
+				return
 		if t%2 == 0:
 			self.accumulates_even.add(x, y, z)
 		else:
@@ -144,7 +152,7 @@ class Spaces:
 	def getSpace(self, t, accumulate=False):
 		if not accumulate:
 			return self.spaces[t]
-		else:		
+		else:
 			if t%2 == 0:
 				return self.accumulates_even
 			else:
@@ -194,7 +202,8 @@ class SpaceTime(object):
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		return self.spaces.getCell(t, x, y, z, accumulate)
-	
+
+	@timing	
 	def getCells(self, t, accumulate=False):
 		return self.spaces.getCells(t, accumulate)
 	
@@ -268,7 +277,7 @@ class SpaceTime(object):
 
 if __name__ == '__main__':
 	print('Creating spacetime...')
-	spacetime = SpaceTime(20, 40, 3)
+	spacetime = SpaceTime(20, 40, dim=3)
 	print('Setting rational set of 25...')
 	spacetime.setRationalSet(25)
 	print('Adding rational set...')

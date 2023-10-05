@@ -258,7 +258,11 @@ class Histogram(QtWidgets.QWidget):
         self.label = QtWidgets.QLabel(self)
         self.layout.addWidget(self.label)
         
-        self.old_pos = 0.
+        self.old_pos = 0.0
+
+    def clear(self):
+        self.scene.clear()
+        self.reset()
 
     def set_number(self, number):
         if self.number != number:
@@ -278,8 +282,9 @@ class Histogram(QtWidgets.QWidget):
     def reset(self):
         img = self.scene.render()
         self.label.setPixmap(self.scene._pil2pixmap(img))
-        self.show()
-        self.update()
+        if self.isVisible():
+            self.show()
+            self.update()
 
     def set_time(self, time, accumulate=False):
         self.time = time
@@ -323,7 +328,7 @@ class Histogram(QtWidgets.QWidget):
         del dict_objs
         gc.collect()
 
-    def prepare_save_image(self, ctx=None):
+    def prepare_save_image(self):
         self.old_time = self.time
 
     def get_save_image(self, time):
