@@ -116,8 +116,12 @@ class Spaces:
 		self.max = max
 		self.dim = dim
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
-		self.accumulates_even = Space(max if T%2 == 0 else max, dim, name='even')
-		self.accumulates_odd = Space(max+1 if T%2 == 1 else max-1, dim, name='odd')
+		if 9 <= T <= 15:
+			self.accumulates_even = Space(max if T%2 == 0 else max-1, dim, name='even')
+			self.accumulates_odd = Space(max if T%2 == 1 else max-1, dim, name='odd')
+		else:
+			self.accumulates_even = Space(max if T%2 == 0 else max, dim, name='even')
+			self.accumulates_odd = Space(max+1 if T%2 == 1 else max-1, dim, name='odd')
 
 	def __del__(self):
 		del self.spaces
