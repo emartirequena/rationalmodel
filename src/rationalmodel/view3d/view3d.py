@@ -428,7 +428,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         for time in range(init_time, end_time + 1):
             scene.displays.clear()
-            objs = self.make_objects(time=time, make_view=False)
+            objs = self.make_objects(frame=time, make_view=False)
             scene.add(objs)
             img = view.render()
             
