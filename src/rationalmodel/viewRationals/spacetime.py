@@ -235,14 +235,9 @@ class SpaceTime(object):
 		del unordered_set
 		gc.collect()
 
-	def add_rational(self, r, t, x, y, z, accumulate, is_special):
-		if accumulate and is_special:
-			cycle = self.max // self.T
-			begin = self.T * (cycle - 1)
-			end = self.T * cycle + 1
-		else:
-			begin = 0
-			end = self.max + 1
+	def add_rational(self, r, t, x, y, z, is_special):
+		begin = 0
+		end = self.max + 1
 		for rt in range(begin, end):
 			pos = list(r.position(rt))
 			pos[0] += x
@@ -252,7 +247,7 @@ class SpaceTime(object):
 				pos[2] += z
 			self.spaces.add(is_special, t+rt, *pos)
 
-	def addRationalSet(self, is_special=False, accumulate=False, t=0, x=0, y=0, z=0):
+	def addRationalSet(self, is_special=False, t=0, x=0, y=0, z=0):
 		# p = Pool(cpu_count())
 		# params = []
 		# connections = []
@@ -280,7 +275,7 @@ class SpaceTime(object):
 		# p.join()
 
 		for r in self.rationalSet:
-			self.add_rational(r, t, x, y, z, accumulate, is_special)
+			self.add_rational(r, t, x, y, z, is_special)
 
 	def save_stats(self, t, fname, accumulate=False):
 		self.spaces.save_stats(t, fname, accumulate=accumulate)
