@@ -5,13 +5,13 @@ block_cipher = None
 
 
 a = Analysis(
-    ['src\\rationalmodel\\view3d\\view3d.py'],
-    pathex=['src\\rationalmodel\\view3d'],
+    ['src\\rationalmodel\\viewRationals\\viewRationals.py'],
+    pathex=['src\\rationalmodel\\viewRationals'],
     binaries=[
 	],
     datas=[
-		('.\\src\\rationalmodel\\view3d\\settings.txt', '.'),
-		('.\\src\\rationalmodel\\view3d\\config.json', '.'),
+		('.\\src\\rationalmodel\\viewRationals\\settings.txt', '.'),
+		('.\\src\\rationalmodel\\viewRationals\\config.json', '.'),
 		('C:\\Python310\\Lib\\site-packages\\madcad\\shaders\\*.*', '.\\madcad\\shaders'),
 		('C:\\Python310\\Lib\\site-packages\\madcad\\textures\\*.*', '.\\madcad\\textures'),
 	],
@@ -34,7 +34,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [('v', None, 'OPTION')],
-    name='view3d',
+    name='viewRationals',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
