@@ -37,8 +37,10 @@ class RenderView(rendering.Offscreen):
         # self.fb_frame is already created and sized by Qt
         self.fb_screen = ctx.simple_framebuffer(size)
         self.fb_ident = ctx.simple_framebuffer(size, components=3, dtype='f1')
-        self.targets = [ ('screen', self.fb_screen, self.setup_screen),
-                            ('ident', self.fb_ident, self.setup_ident)]
+        self.targets = [ 
+            ('screen', self.fb_screen, self.setup_screen),
+            ('ident', self.fb_ident, self.setup_ident)
+        ]
         self.map_ident = np.empty((h,w), dtype='u2')
         self.map_depth = np.empty((h,w), dtype='f4')
 
