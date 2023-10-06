@@ -71,6 +71,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view = None
         self.first_number_set = False
         self.period_changed = False
+        self.number_changed = False
         self.histogram = None
         self.view_histogram = True
         self.spacetime = None
@@ -159,6 +160,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.maxTime = QtWidgets.QSpinBox(self)
         self.maxTime.valueChanged.connect(self.timeWidget.setMaximum)
         self.maxTime.valueChanged.connect(self.timeWidget.setValue)
+        self.maxTime.valueChanged.connect(self.maxTimeChanged)
         self.maxTime.setMinimum(0)
         self.maxTime.setMaximum(10000)
         self.gridLayout.addWidget(self.maxTime, 2, 1)
@@ -277,13 +279,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionRight.triggered.connect(self.incrementTime)
         self.menuTime.addAction(self.actionRight)
 
-        self.actionInit = QtWidgets.QAction('Go to init time', self.centralWidget())
+        self.actionInit = QtWidgets.QAction('Go to init', self.centralWidget())
         self.actionInit.setShortcut('Home')
         self.actionInit.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionInit.triggered.connect(self.setTimeInit)
         self.menuTime.addAction(self.actionInit)
 
-        self.actionEnd = QtWidgets.QAction('Go to end time', self.centralWidget())
+        self.actionEnd = QtWidgets.QAction('Go to end', self.centralWidget())
         self.actionEnd.setShortcut('End')
         self.actionEnd.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         self.actionEnd.triggered.connect(self.setTimeEnd)
@@ -617,11 +619,16 @@ class MainWindow(QtWidgets.QMainWindow):
     def compute(self, nada=False):
         if not int(self.number.value()):
             return
+        
+        if not self.number_changed and self._check_accumulate():
+            self.make_objects()
+            self.period_changed = False
+            return
+        self.number_changed = False
 
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
         if self.spacetime is not None:
-            print('------- del spacetime...')
             if self.histogram is not None:
                 self.histogram.set_spacetime(None)
             del self.spacetime
@@ -883,9 +890,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.divisors.addItem(item)
                 
     def setNumber(self, index):
+        self.number_changed = True
         item = self.divisors.item(index.row())
         self.is_special = item.data(Qt.UserRole)
         self.number.setValue(int(item.text().split(' ', 1)[0]))
+
+    def maxTimeChanged(self):
+        self.number_changed = True
 
 
 if __name__=="__main__":
