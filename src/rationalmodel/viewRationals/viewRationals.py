@@ -70,8 +70,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.selected = {}
         self.view = None
         self.first_number_set = False
-        self.period_changed = False
-        self.number_changed = False
+        self.need_compute = True
         self.histogram = None
         self.view_histogram = True
         self.spacetime = None
@@ -620,11 +619,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if not int(self.number.value()):
             return
         
-        if not self.number_changed and self._check_accumulate():
+        if not self.need_compute:
             self.make_objects()
             self.period_changed = False
             return
-        self.number_changed = False
+
+        self.need_compute = False
 
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
@@ -644,17 +644,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.spacetime.setRationalSet(int(self.number.value()))
 
         self.setStatus('Adding rational set...')
-        self.spacetime.addRationalSet(self.is_special, self._check_accumulate())
+        self.spacetime.addRationalSet(self.is_special)
         self.setStatus(f'Rational set added for number {int(self.number.value())}')
     
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
         self.make_objects()
-        self.period_changed = False
 
         app.restoreOverrideCursor()
 
+    @timing
     def make_objects(self, frame:int=0, make_view:bool=True):
         if not self.spacetime:
             return
@@ -844,7 +844,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_period_factors(self):
         self.setStatus('Computing divisors...')
-        self.period_changed = True
+        self.need_compute = True
         T = int(self.period.value())
         self.spacetime = None
         self.fillDivisors(T)
@@ -890,14 +890,13 @@ class MainWindow(QtWidgets.QMainWindow):
             self.divisors.addItem(item)
                 
     def setNumber(self, index):
-        self.number_changed = True
+        self.need_compute = True
         item = self.divisors.item(index.row())
         self.is_special = item.data(Qt.UserRole)
         self.number.setValue(int(item.text().split(' ', 1)[0]))
 
     def maxTimeChanged(self):
-        self.number_changed = True
-
+        self.need_compute = True
 
 if __name__=="__main__":
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
