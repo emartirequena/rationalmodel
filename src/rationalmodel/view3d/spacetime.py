@@ -36,9 +36,10 @@ class Cell(object):
 
 
 class Space(object):
-	def __init__(self, t, dim):
+	def __init__(self, t, dim, name='normal'):
 		self.t = t
 		self.dim = dim
+		self.name = name
 		self.base = 2**dim
 		self.cells = []
 		if self.dim == 1:
@@ -67,14 +68,20 @@ class Space(object):
 		nx = c * self.t - x
 		ny = (c * self.t - y) if self.dim > 1 else 0.0
 		nz = (c * self.t - z) if self.dim > 2 else 0.0
-		n = nx + (self.t + 1) * (ny + (self.t + 1) * nz)
+		n = int(nx + (self.t + 1) * (ny + (self.t + 1) * nz))
+		# print(f'{self.name} {self.t} ({x}, {y}, {z}), {int(n)} / {len(self.cells)}')
+		if n >= len(self.cells):
+			return None
 		return self.cells[int(n)]
 	
 	def getCells(self):
 		return list(filter(lambda x: x.count != 0, self.cells))
 
 	def add(self, x, y=0.0, z=0.0):
-		self.getCell(x, y, z).add()
+		cell = self.getCell(x, y, z)
+		if not cell:
+			return
+		cell.add()
 
 	def save_stats(self, fname):
 		objs = {}
@@ -109,8 +116,8 @@ class Spaces:
 		self.max = max
 		self.dim = dim
 		self.spaces = [Space(t, dim) for t in range(max + 1)]
-		self.accumulates_even = Space(max if T%2 == 0 else max-1, dim)
-		self.accumulates_odd = Space(max if T%2 == 1 else max-1, dim)
+		self.accumulates_even = Space(max if T%2 == 0 else max, dim, name='even')
+		self.accumulates_odd = Space(max+1 if T%2 == 1 else max-1, dim, name='odd')
 
 	def __del__(self):
 		del self.spaces

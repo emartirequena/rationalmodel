@@ -45,6 +45,8 @@ class MainView(rendering.View):
                     y = center.y
                     z = center.z
                 cell = spacetime.getCell(t, x, y, z, accumulate=self.mainWindow._check_accumulate())
+                if not cell:
+                    return False
                 count = cell.count
                 self.mainWindow.select_cells(count)
                 self.mainWindow.refresh_selection()
@@ -701,9 +703,9 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.dim == 3:
                 obj = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
             elif self.dim == 2:
-                obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, 1., cell.y), rad)
+                obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
             else:
-                obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha * 10))
+                obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
 
             obj.option(color=color)
             self.objs[id] = obj
@@ -721,8 +723,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 cube = Box(center=vec3(0), width=frame)
             else:
                 t = self.maxTime.value()
-                t = t if t%2 == 0 else t-1
-                cube = Box(center=vec3(0), width=t)
+                cube = Box(center=vec3(0), width=t if frame%2 == 0 else t-1)
             id = self.config.getKey()
             self.objs[id] = cube
 
@@ -799,6 +800,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def center_view(self):
         if not self.view:
             return
+        self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
         self.view.center()
         self.view.adjust()
         self.view.update()
