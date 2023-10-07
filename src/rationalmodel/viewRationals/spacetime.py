@@ -126,8 +126,10 @@ class Spaces:
 	def __del__(self):
 		del self.spaces
 
-	def add(self, is_special, t, x, y=0, z=0):
+	def add(self, is_special, t, cycle, x, y=0, z=0):
 		self.spaces[t].add(x, y, z)
+		if t < self.max - cycle:
+			return
 		if self.dim == 1:
 			if (x == t * c or x == -t * c) and is_special:
 				return
@@ -245,7 +247,7 @@ class SpaceTime(object):
 				pos[1] += y
 			if self.dim > 2:
 				pos[2] += z
-			self.spaces.add(is_special, t+rt, *pos)
+			self.spaces.add(is_special, t+rt, self.T, *pos)
 
 	def addRationalSet(self, is_special=False, t=0, x=0, y=0, z=0):
 		# p = Pool(cpu_count())
@@ -287,6 +289,6 @@ if __name__ == '__main__':
 	print('Setting rational set of 25...')
 	spacetime.setRationalSet(25)
 	print('Adding rational set...')
-	spacetime.addRationalSet(is_special=True, accumulate=True)
+	spacetime.addRationalSet(is_special=True)
 	config = Config()
 	spacetime.save_stats(40, os.path.join(config.get('image_path'), 'test.json'), accumulate=True)
