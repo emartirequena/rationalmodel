@@ -416,7 +416,7 @@ class MainWindow(QtWidgets.QMainWindow):
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
         histogram_resy = self.config.get('histogram_resy')
-        frame_rate = self.config.get('frame_rate')
+        frame_rate = self.config.get('frame_rate') if not self._check_accumulate() else 0.25
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
         video_format = self.config.get('video_format')
@@ -522,16 +522,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def saveImage(self):
         self._saveImages(self.time.value(), self.time.value())
+        self.make_objects()
 
     def saveVideo(self):
-        if not self._check_accumulate():
-            self._saveImages(0, self.maxTime.value())
-        else:
-            self._saveImages(0, 1)
+        self._saveImages(0, self.maxTime.value())
+        self.make_objects()
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
-            if len(list(self.view.scene.item([0]))) == 1:
+            if len(self.view.scene.item([0])) == 1:
+                print(f'{self.view.scene.item([0])}')
                 disp = self.view.scene.item([0])[0].displays[id]
             else:
                 disp = self.view.scene.item([0])[id]
