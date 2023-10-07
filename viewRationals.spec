@@ -34,7 +34,7 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [('v', None, 'OPTION')],
-    name='viewRationals',
+    name='View Rationals',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
