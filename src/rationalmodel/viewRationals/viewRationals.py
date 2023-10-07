@@ -524,7 +524,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.make_objects()
 
     def saveVideo(self):
-        self._saveImages(0, 6)
+        if self._check_accumulate():
+            self._saveImages(0, 6)
+        else:
+            self._saveImages(0, self.maxTime.value())
         self.make_objects()
 
     def _switch_display(self, count, state=None):
