@@ -113,6 +113,8 @@ class Scene:
                 continue
             h = np.power(y / y_max, self.y_factor) * self.height
             draw.line((0, self.height - h, self.width, self.height - h), color, 1)
+            if y % (5 * y_step) == 0:
+                draw.text((5, self.height - h), str(y * 4), fill=color, size=12)
 
         x_step, x_max = self._get_x_step_max(x_base)
         for x in range(-x_max, x_max, x_step):
