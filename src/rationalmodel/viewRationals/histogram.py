@@ -100,7 +100,7 @@ class Scene:
         x_max = x_step * np.power(x_base, 3)
         return x_step, x_max
 
-    def _render_grid(self, draw):
+    def _render_grid(self, draw: ImageDraw):
         x_base = 10
         y_base = 5
 
@@ -126,6 +126,8 @@ class Scene:
             if px < 0 or px > self.width: continue
             w = 1 if np.abs(px) > 0.1 else 3
             draw.line((px, self.height, px, 0), color, w)
+            if abs(x_max - x) % ( 5 * x_step) == 0:
+                draw.text((px, 6), str(x), fill=color, size=12)
 
     def render(self):
         img = Image.new('RGB', (self.width, self.height), (0, 0, 0))
@@ -147,13 +149,9 @@ class Scene:
     def itemat(self, x):
         x = self.screen2world(x)
         eps = epsilon / self.scl
-        print(f'eps: {eps:0.2f}, x: {x:0.2f}')
         for item in self.items:
             if item.x - eps <= x <= item.x + eps:
-                print(f'item.x: {item.x:0.2f}')
                 return item
-            # if item.check_position(x, eps):
-            #     return item
         return None
 
     @staticmethod
@@ -384,24 +382,6 @@ class Histogram(QtWidgets.QWidget):
         self.scene.scale(pos, step)
         self.reset()
         a0.accept()
-
-    # def keyPressEvent(self, a0: QKeyEvent) -> None:
-    #     print('hist: ------- key press event...')
-    #     if a0.key() == QtCore.Qt.Key.Key_F:
-    #         self.scene.fit()
-    #         self.reset()
-    #         a0.accept()
-    #         return
-    #     if not self.parent():
-    #         if a0.key() == QtCore.Qt.Key.Key_Left and self.time > 0:
-    #             self.set_time(self.time - 1)
-    #             a0.accept()
-    #             return
-    #         elif a0.key() == QtCore.Qt.Key.Key_Right and self.time < 30:
-    #             self.set_time(self.time + 1)
-    #             a0.accept()
-    #             return
-    #         return super().keyPressEvent(a0)
 
 
 if __name__ == '__main__':

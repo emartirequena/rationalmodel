@@ -238,9 +238,7 @@ class SpaceTime(object):
 		gc.collect()
 
 	def add_rational(self, r, t, x, y, z, is_special):
-		begin = 0
-		end = self.max + 1
-		for rt in range(begin, end):
+		for rt in range(self.max + 1):
 			pos = list(r.position(rt))
 			pos[0] += x
 			if self.dim > 1:

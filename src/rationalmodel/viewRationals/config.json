@@ -4,8 +4,8 @@
     "ffmpeg_path": "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
     "video_resx": 1920,
     "video_resy": 1080,
-    "video_codec": "prores",
-    "video_format": "mov",
+    "video_codec": "libx264",
+    "video_format": "mp4",
     "frame_rate": 1,
     "bit_rate": 4000,
     "colors": [
