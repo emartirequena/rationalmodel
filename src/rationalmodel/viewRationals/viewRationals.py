@@ -158,7 +158,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.gridLayout.addWidget(self.label2, 2, 0)
         self.maxTime = QtWidgets.QSpinBox(self)
         self.maxTime.valueChanged.connect(self.timeWidget.setMaximum)
-        self.maxTime.valueChanged.connect(self.timeWidget.setValue)
+        # self.maxTime.valueChanged.connect(self.timeWidget.setValue)
         self.maxTime.valueChanged.connect(self.maxTimeChanged)
         self.maxTime.setMinimum(0)
         self.maxTime.setMaximum(10000)
@@ -387,15 +387,14 @@ class MainWindow(QtWidgets.QMainWindow):
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def _getDimStr(self):
-        if self.dim == 1: return '1D'
-        elif self.dim == 2: return '2D'
-        else: return '3D'
+        dims = ['1D', '2D', '3D']
+        return dims[self.dim - 1]
 
     def _makePath(self, period, number):
+        factors = self.get_output_factors(number)
         if self._check_accumulate():
-            path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate')
+            path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
         else:
-            factors = self.get_output_factors(number)
             path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
         if not os.path.exists(path):
             os.makedirs(path)
@@ -416,7 +415,7 @@ class MainWindow(QtWidgets.QMainWindow):
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
         histogram_resy = self.config.get('histogram_resy')
-        frame_rate = self.config.get('frame_rate') if not self._check_accumulate() else 0.25
+        frame_rate = self.config.get('frame_rate') if not self._check_accumulate() else 0.5
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
         video_format = self.config.get('video_format')
@@ -525,7 +524,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.make_objects()
 
     def saveVideo(self):
-        self._saveImages(0, self.maxTime.value())
+        self._saveImages(0, 6)
         self.make_objects()
 
     def _switch_display(self, count, state=None):
@@ -650,6 +649,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
+        self.time.setValue(self.maxTime.value())
         self.make_objects()
 
         app.restoreOverrideCursor()
