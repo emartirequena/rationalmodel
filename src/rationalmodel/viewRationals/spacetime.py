@@ -128,7 +128,7 @@ class Spaces:
 
 	def add(self, is_special, t, cycle, x, y=0, z=0):
 		self.spaces[t].add(x, y, z)
-		if t < self.max - cycle:
+		if t < self.max - cycle and is_special:
 			return
 		if self.dim == 1:
 			if (x == t * c or x == -t * c) and is_special:
