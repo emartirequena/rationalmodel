@@ -390,10 +390,13 @@ class MainWindow(QtWidgets.QMainWindow):
         dims = ['1D', '2D', '3D']
         return dims[self.dim - 1]
 
-    def _makePath(self, period, number):
+    def _makePath(self, period, number, single_image=False):
         factors = self.get_output_factors(number)
         if self._check_accumulate():
-            path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
+            if not single_image:
+                path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
+            else:
+                path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}', 'Images')
         else:
             path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
         if not os.path.exists(path):
@@ -409,13 +412,17 @@ class MainWindow(QtWidgets.QMainWindow):
         number = int(self.number.value())
         period = self.period.value()
         factors = self.get_output_factors(number)
-        
-        path = self._makePath(period, number)
+
+        single_image = True if init_time == end_time else False
+        path = self._makePath(period, number, single_image=single_image)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
         histogram_resy = self.config.get('histogram_resy')
-        frame_rate = self.config.get('frame_rate') if not self._check_accumulate() else 0.5
+        if self._check_accumulate():
+            frame_rate = self.config.get('frame_rate_accum')
+        else:
+            frame_rate = self.config.get('frame_rate')
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
         video_format = self.config.get('video_format')
@@ -533,7 +540,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
             if len(self.view.scene.item([0])) == 1:
-                print(f'{self.view.scene.item([0])}')
                 disp = self.view.scene.item([0])[0].displays[id]
             else:
                 disp = self.view.scene.item([0])[id]
@@ -652,8 +658,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
-        self.time.setValue(self.maxTime.value())
-        self.make_objects()
+        if self.time.value() != self.maxTime.value():
+            self.time.setValue(self.maxTime.value())
+        else:
+            self.make_objects()
 
         app.restoreOverrideCursor()
 
