@@ -396,9 +396,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if not single_image:
                 path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
             else:
-                path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}', 'Images')
+                path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}', 'Snapshots')
         else:
-            path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
+            if not single_image:
+                path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
+            else:
+                path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}', 'Snapshots')
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -533,11 +536,13 @@ class MainWindow(QtWidgets.QMainWindow):
         self.make_objects()
 
     def saveVideo(self):
+        app.setOverrideCursor(QtCore.Qt.WaitCursor)
         if self._check_accumulate():
             self._saveImages(0, 6)
         else:
             self._saveImages(0, self.maxTime.value())
         self.make_objects()
+        app.restoreOverrideCursor()
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
