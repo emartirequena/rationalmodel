@@ -92,13 +92,13 @@ class Scene:
         y_step = int(self._loga_round(y_base, self.max_h))
         y_step = y_step if y_step > 0 else 1
         y_max = y_step * np.power(y_base, 2)
-        return y_step, y_max
+        return int(y_step), int(y_max)
     
     def _get_x_step_max(self, x_base):
         x_step = self._loga_round(x_base, x_base * 10 / self.scl)
         x_step = x_step if x_step > 0 else 1
-        x_max = x_step * np.power(x_base, 3)
-        return x_step, x_max
+        x_max = x_step * int(np.power(x_base, 3))
+        return int(x_step), int(x_max)
 
     def _render_grid(self, draw: ImageDraw):
         x_base = 10
@@ -114,7 +114,7 @@ class Scene:
             h = np.power(y / y_max, self.y_factor) * self.height
             draw.line((0, self.height - h, self.width, self.height - h), color, 1)
             if y % (5 * y_step) == 0:
-                draw.text((5, self.height - h), str(y * 4), fill=color, size=12)
+                draw.text((3, self.height - h), f'{y*4}', fill=color, size=12)
 
         x_step, x_max = self._get_x_step_max(x_base)
         for x in range(-x_max, x_max, x_step):
@@ -124,12 +124,12 @@ class Scene:
             else:
                 if abs(x_max - x) % ( 5 * x_step) == 0: color = colors[2]
                 if abs(x_max - x) % (10 * x_step) == 0: color = colors[1]
-            px = int((x + self.ox) * self.scl)
+            px = int(int(x + self.ox) * self.scl)
             if px < 0 or px > self.width: continue
             w = 1 if np.abs(px) > 0.1 else 3
             draw.line((px, self.height, px, 0), color, w)
             if abs(x_max - x) % ( 5 * x_step) == 0:
-                draw.text((px, 6), str(x), fill=color, size=12)
+                draw.text((px+4, 4), f'{x:,d}', fill=color, size=12)
 
     def render(self):
         img = Image.new('RGB', (self.width, self.height), (0, 0, 0))

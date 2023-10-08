@@ -15,7 +15,8 @@ class Config:
             'video_codec': 'prores',
             'video_format': 'mov',
             'frame_rate': 1,
-            'bit_rate': 4000,
+            'frame_rate_accum': 0.5,
+            'bit_rate': '20M',
             'colors': [
                 {'alpha': 0.0, 'color': [0.2, 0.2, 1.0]},
                 {'alpha': 0.5, 'color': [0.3, 0.6, 0.5]},
