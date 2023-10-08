@@ -124,7 +124,7 @@ class Scene:
             else:
                 if abs(x_max - x) % ( 5 * x_step) == 0: color = colors[2]
                 if abs(x_max - x) % (10 * x_step) == 0: color = colors[1]
-            px = int(int(x + self.ox) * self.scl)
+            px = int((x + self.ox) * self.scl)
             if px < 0 or px > self.width: continue
             w = 1 if np.abs(px) > 0.1 else 3
             draw.line((px, self.height, px, 0), color, w)
