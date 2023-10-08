@@ -472,12 +472,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if init_time != end_time:
 
             if not self._check_accumulate():
-                in_sequence_path = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
-                main_video_path = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
+                main_video_name = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
                 self.setStatus('Making main sequence video...')
                 result = make_video(
                     ffmpeg_path, 
-                    in_sequence_path, main_video_path, 
+                    in_sequence_name, main_video_name, 
                     video_codec, video_format, 
                     frame_rate, bit_rate, 
                     image_resx, image_resy
@@ -486,30 +486,31 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.setStatus('ffmepg not found... (check config.json file specification)')
                     return
 
-                in_sequence_path = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
-                hist_video_path = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
+                hist_video_name = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
                 self.setStatus('Making histogram video...')
                 make_video(
                     ffmpeg_path, 
-                    in_sequence_path, hist_video_path, 
+                    in_sequence_name, hist_video_name, 
                     video_codec, video_format, 
                     frame_rate, bit_rate, 
                     histogram_resx, histogram_resy
                 )
 
                 self.setStatus('Copying video...')
-                if not os.path.exists(video_path):
-                    os.makedirs(video_path)
-                dest_video_path = os.path.join(video_path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
-                shutil.copyfile(main_video_path, dest_video_path)
+                out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
+                if not os.path.exists(out_video_path):
+                    os.makedirs(out_video_path)
+                dest_video_name = os.path.join(out_video_path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                shutil.copyfile(main_video_name, dest_video_name)
 
             else:
-                in_sequence_path = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
-                main_video_path = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
+                main_video_name = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
                 self.setStatus('Making main sequence video...')
                 result = make_video(
                     ffmpeg_path, 
-                    in_sequence_path, main_video_path, 
+                    in_sequence_name, main_video_name, 
                     video_codec, video_format, 
                     frame_rate, bit_rate, 
                     image_resx, image_resy
@@ -519,10 +520,11 @@ class MainWindow(QtWidgets.QMainWindow):
                     return
 
                 self.setStatus('Copying video...')
-                if not os.path.exists(video_path):
-                    os.makedirs(video_path)
-                dest_video_path = os.path.join(video_path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
-                shutil.copyfile(main_video_path, dest_video_path)
+                out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
+                if not os.path.exists(out_video_path):
+                    os.makedirs(out_video_path)
+                dest_video_name = os.path.join(out_video_path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                shutil.copyfile(main_video_name, dest_video_name)
 
             self.setStatus('Videos saved...')
 
