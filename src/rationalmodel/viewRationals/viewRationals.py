@@ -396,12 +396,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if not single_image:
                 path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
             else:
-                path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}', 'Snapshots')
+                path = os.path.join(self.config.get('image_path'), 'Snapshots', self._getDimStr(), 'Accumulate')
         else:
             if not single_image:
                 path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
             else:
-                path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}', 'Snapshots')
+                path = os.path.join(self.config.get('image_path'), 'Snapshots', self._getDimStr(), 'Not Accumulate')
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -748,7 +748,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 cube = Box(center=vec3(0), width=frame)
             else:
                 t = self.maxTime.value()
-                cube = Box(center=vec3(0), width=t if frame%2 == 0 else t-1)
+                cube = Box(center=vec3(0), width=t if frame%2 == 0 else t+c)
             id = self.config.getKey()
             self.objs[id] = cube
 
