@@ -532,8 +532,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.setStatus('Videos saved...')
 
     def saveImage(self):
+        app.setOverrideCursor(QtCore.Qt.WaitCursor)
         self._saveImages(self.time.value(), self.time.value())
         self.make_objects()
+        app.restoreOverrideCursor()
 
     def saveVideo(self):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
