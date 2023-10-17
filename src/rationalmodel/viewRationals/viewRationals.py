@@ -6,10 +6,13 @@ import shutil
 from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
+import typing
+from PyQt5.QtWidgets import QWidget
 
-from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3
+from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3, text
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
+from PIL import Image, ImageDraw, ImageFont
 
 from spacetime import SpaceTime
 from rationals import c
@@ -59,6 +62,58 @@ class MainView(rendering.View):
         return False
 
 
+class SaveSpecialsWidget(QtWidgets.QDialog):
+    def __init__(self, parent, current_period, maximum_period) -> None:
+        super().__init__(parent)
+        
+        self.vlayout = QtWidgets.QVBoxLayout()
+        self.gridlayout = QtWidgets.QGridLayout()
+        self.vlayout.addLayout(self.gridlayout)
+
+        self.label1 = QtWidgets.QLabel('Init period')
+        self.gridlayout.addWidget(self.label1, 0, 0)
+        self.init_period = QtWidgets.QSpinBox(self)
+        self.init_period.setMinimum(1)
+        self.init_period.setMaximum(maximum_period)
+        self.init_period.setValue(current_period)
+        self.gridlayout.addWidget(self.init_period, 0, 1)
+
+        self.label2 = QtWidgets.QLabel('End period')
+        self.gridlayout.addWidget(self.label2, 1, 0)
+        self.end_period = QtWidgets.QSpinBox(self)
+        self.end_period.setMinimum(1)
+        self.end_period.setMaximum(maximum_period)
+        self.end_period.setValue(maximum_period)
+        self.gridlayout.addWidget(self.end_period, 1, 1)
+
+        self.label3 = QtWidgets.QLabel('Subfolder')
+        self.gridlayout.addWidget(self.label3, 2, 0)
+        self.subfolder = QtWidgets.QLineEdit(self)
+        self.gridlayout.addWidget(self.subfolder, 2, 1)
+
+        self.hlayout = QtWidgets.QHBoxLayout()
+        self.hlayout.addStretch()
+        self.button_save = QtWidgets.QPushButton('Save Specials', self)
+        self.button_save.clicked.connect(self.save)
+        self.hlayout.addWidget(self.button_save)
+        
+        self.button_cancel = QtWidgets.QPushButton('Cancel', self)
+        self.button_cancel.clicked.connect(self.close)
+        self.hlayout.addWidget(self.button_cancel)
+
+        self.vlayout.addLayout(self.hlayout)
+        self.setLayout(self.vlayout)
+
+        self.setWindowTitle('Save specials')
+
+    def save(self):
+        if self.end_period.value() <= self.init_period.value():
+            QtWidgets.QErrorMessage(self, 'End period must be greater than init period')
+            return
+        self.close()
+        self.parent().saveSpecialsNumbers(self.init_period.value(), self.end_period.value(), self.subfolder.text())
+
+
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
@@ -70,6 +125,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.selected = {}
         self.view = None
         self.first_number_set = False
+        self.changed_spacetime = True
         self.need_compute = True
         self.histogram = None
         self.view_histogram = True
@@ -224,6 +280,11 @@ class MainWindow(QtWidgets.QMainWindow):
         self.actionSaveVideo.setShortcut('V')
         self.actionSaveVideo.triggered.connect(self.saveVideo)
         self.menuUtils.addAction(self.actionSaveVideo)
+
+        self.actionSaveSpecials = QtWidgets.QAction('Save Specials', self)
+        self.actionSaveSpecials.setShortcut('S')
+        self.actionSaveSpecials.triggered.connect(self.saveSpecials)
+        self.menuUtils.addAction(self.actionSaveSpecials)
 
         self.menuUtils.addSeparator()
 
@@ -390,23 +451,34 @@ class MainWindow(QtWidgets.QMainWindow):
         dims = ['1D', '2D', '3D']
         return dims[self.dim - 1]
 
-    def _makePath(self, period, number, single_image=False):
+    def _makePath(self, period, number, single_image=False, subfolder=''):
         factors = self.get_output_factors(number)
+        image_path = self.config.get('image_path')
         if self._check_accumulate():
             if not single_image:
-                path = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
+                path = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
             else:
-                path = os.path.join(self.config.get('image_path'), 'Snapshots', self._getDimStr(), 'Accumulate')
+                path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Accumulate', subfolder)
         else:
             if not single_image:
-                path  = os.path.join(self.config.get('image_path'), f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
+                path  = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
             else:
-                path = os.path.join(self.config.get('image_path'), 'Snapshots', self._getDimStr(), 'Not Accumulate')
+                path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Not Accumulate', subfolder)
         if not os.path.exists(path):
             os.makedirs(path)
         return path
 
-    def _saveImages(self, init_time, end_time):
+    def _get_number_img(self):
+        img = Image.new('RGBA', (500, 40), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(img)
+        string = f'number: {self.number.value():,.0f} period: {self.period.value():02d}'.replace(',', '.')
+        width = draw.textlength(string) + 10
+        img.resize((width, 40))
+        font = ImageFont.FreeTypeFont('NotoMono-Regular.ttf', size=24)
+        draw.text((0, 0), string, font=font, fill=(255, 255, 255, 255))
+        return img
+
+    def _saveImages(self, init_time, end_time, subfolder=''):
         self.setStatus('Saving images...')
         
         projection = deepcopy(self.view.projection)
@@ -417,7 +489,7 @@ class MainWindow(QtWidgets.QMainWindow):
         factors = self.get_output_factors(number)
 
         single_image = True if init_time == end_time else False
-        path = self._makePath(period, number, single_image=single_image)
+        path = self._makePath(period, number, single_image=single_image, subfolder=subfolder)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
@@ -444,7 +516,7 @@ class MainWindow(QtWidgets.QMainWindow):
             scene.add(objs)
             img = view.render()
             
-            file_name = f'{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.{time:04d}.png'
+            file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
                 hist_img = self.histogram.get_save_image(time)
@@ -452,6 +524,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 if self._check_accumulate():
                     hist_name = 'Accum_' + hist_name
                 hist_img.save(os.path.join(path, hist_name))
+
+            if init_time == end_time:
+                number_img = self._get_number_img()
+                img.alpha_composite(number_img, (10, image_resy - 40))
 
             if self._check_accumulate():
                 file_name = 'Accum_' + file_name
@@ -475,8 +551,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if init_time != end_time:
 
             if not self._check_accumulate():
-                in_sequence_name = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
-                main_video_name = os.path.join(path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
+                main_video_name = os.path.join(path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
                 self.setStatus('Making main sequence video...')
                 result = make_video(
                     ffmpeg_path, 
@@ -489,8 +565,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.setStatus('ffmepg not found... (check config.json file specification)')
                     return
 
-                in_sequence_name = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
-                hist_video_name = os.path.join(path, f'Hist_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
+                hist_video_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
                 self.setStatus('Making histogram video...')
                 make_video(
                     ffmpeg_path, 
@@ -504,12 +580,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
                 if not os.path.exists(out_video_path):
                     os.makedirs(out_video_path)
-                dest_video_name = os.path.join(out_video_path, f'{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                dest_video_name = os.path.join(out_video_path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
                 shutil.copyfile(main_video_name, dest_video_name)
 
             else:
-                in_sequence_name = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number}_F{factors}.%04d.png')
-                main_video_name = os.path.join(path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'Accum_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
+                main_video_name = os.path.join(path, f'Accum_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
                 self.setStatus('Making main sequence video...')
                 result = make_video(
                     ffmpeg_path, 
@@ -526,14 +602,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
                 if not os.path.exists(out_video_path):
                     os.makedirs(out_video_path)
-                dest_video_name = os.path.join(out_video_path, f'Accum_{self._getDimStr()}_P{period:02d}_N{number:d}_F{factors}.{video_format}')
+                dest_video_name = os.path.join(out_video_path, f'Accum_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
                 shutil.copyfile(main_video_name, dest_video_name)
 
             self.setStatus('Videos saved...')
 
-    def saveImage(self):
+    def saveImage(self, subfolder=''):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
-        self._saveImages(self.time.value(), self.time.value())
+        self._saveImages(self.time.value(), self.time.value(), subfolder)
         self.make_objects()
         app.restoreOverrideCursor()
 
@@ -636,26 +712,31 @@ class MainWindow(QtWidgets.QMainWindow):
         if not int(self.number.value()):
             return
         
+        print(f'need_compute: {self.need_compute}, changed_spacetime: {self.changed_spacetime}')
+        
         if not self.need_compute:
             self.make_objects()
             self.period_changed = False
             return
-
         self.need_compute = False
 
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
-        if self.spacetime is not None:
-            if self.histogram is not None:
-                self.histogram.set_spacetime(None)
-            del self.spacetime
-            self.spacetime = None
-            gc.collect(2)
-
         self.deselect_all()
 
-        self.setStatus('Creating incremental spacetime...')
-        self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=self.dim)
+        if self.changed_spacetime:
+            if self.spacetime is not None:
+                if self.histogram is not None:
+                    self.histogram.set_spacetime(None)
+                del self.spacetime
+                self.spacetime = None
+                gc.collect(2)
+
+            self.setStatus('Creating incremental spacetime...')
+            self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=self.dim)
+        else:
+            self.spacetime.clear()
+        self.changed_spacetime = False
 
         self.setStatus(f'Setting rational set for number: {int(self.number.value())} ...')
         self.spacetime.setRationalSet(int(self.number.value()))
@@ -864,6 +945,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_period_factors(self):
         self.setStatus('Computing divisors...')
+        self.changed_spacetime = True
         self.need_compute = True
         T = int(self.period.value())
         self.spacetime = None
@@ -874,6 +956,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cycles = (4 if T < 8 else (3 if T < 17 else 2))
         self.maxTime.setValue(T * self.cycles)
         self.maxTime.setSingleStep(T)
+        self.setStatus('Divisors computed. Select now a number on the list and press \bCompute\b button')
 
     def fillDivisors(self, T: int):
         a = int(2 ** self.dim)
@@ -916,7 +999,38 @@ class MainWindow(QtWidgets.QMainWindow):
         self.number.setValue(int(item.text().split(' ', 1)[0]))
 
     def maxTimeChanged(self):
+        self.changed_spacetime = True
         self.need_compute = True
+
+    def saveSpecials(self):
+        widget = SaveSpecialsWidget(self, self.period.value(), 61)
+        widget.show()
+
+    def saveSpecialsNumbers(self, init_period, end_period, subfolder):
+        self.accumulate.setChecked(True)
+        for period in range(init_period, end_period + 1, 2):
+            if 46 <= period <= 48 and self.dim == 3:
+                continue
+            self.period.setValue(period)
+            self.changed_spacetime = True
+            for row in range(len(self.divisors)):
+                self.need_compute = True
+                item = self.divisors.item(row)
+                is_special = item.data(Qt.UserRole)
+                if not is_special:
+                    continue
+                number = int(item.text().split(' ', 1)[0])
+                if number > 1650000:
+                    continue
+                print(f'------ saving number {number}')
+                self.is_special = is_special
+                self.number.setValue(number)
+                self.update()
+                self.compute()
+                self.saveImage(subfolder=subfolder)
+                print(f'------ number {number} saved')
+        self.changed_spacetime = True
+
 
 if __name__=="__main__":
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)

@@ -22,6 +22,9 @@ class Cell(object):
 	def add(self):
 		self.count += 1
 
+	def clear(self):
+		self.count = 0
+
 	def get(self):
 		pos = (self.x, )
 		if self.dim > 1:
@@ -83,6 +86,10 @@ class Space(object):
 			return
 		cell.add()
 
+	def clear(self):
+		for cell in self.cells:
+			cell.clear()
+
 	def save_stats(self, fname):
 		objs = {}
 		view_cells = list(filter(lambda x: x.count != 0, self.cells))
@@ -143,6 +150,10 @@ class Spaces:
 			self.accumulates_even.add(x, y, z)
 		else:
 			self.accumulates_odd.add(x, y, z)
+
+	def clear(self):
+		for space in self.spaces:
+			space.clear()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		if not accumulate:
@@ -213,6 +224,9 @@ class SpaceTime(object):
 	def add(self, is_special, t, x, y=0, z=0):
 		self.spaces.add(t, is_special, x, y , z)
 
+	def clear(self):
+		self.spaces.clear()
+
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		return self.spaces.getCell(t, x, y, z, accumulate)
 
@@ -222,7 +236,7 @@ class SpaceTime(object):
 	
 	def getSpace(self, t, accumulate=False):
 		return self.spaces.getSpace(t, accumulate)
-
+	
 	def setRationalSet(self, n: int):
 		p = Pool(cpu_count())
 		params = []

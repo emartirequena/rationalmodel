@@ -12,6 +12,7 @@ a = Analysis(
     datas=[
 		('.\\src\\rationalmodel\\viewRationals\\settings.txt', '.'),
 		('.\\src\\rationalmodel\\viewRationals\\config.json', '.'),
+		('.\\src\\rationalmodel\\viewRationals\\NotoMono-Regular.ttf', '.'),
 		('C:\\Python310\\Lib\\site-packages\\madcad\\shaders\\*.*', '.\\madcad\\shaders'),
 		('C:\\Python310\\Lib\\site-packages\\madcad\\textures\\*.*', '.\\madcad\\textures'),
 	],
