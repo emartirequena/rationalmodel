@@ -3,6 +3,8 @@ import time
 from functools import reduce
 from copy import copy
 import subprocess
+from PIL import Image, ImageDraw
+from PyQt5 import QtGui
 
 
 def timing(f):
@@ -21,6 +23,22 @@ def lerp(t, ta, a, tb, b):
 
 def check_ffmpeg(ffmpeg_path: str) -> bool:
     return os.path.exists(ffmpeg_path)
+
+
+def _pil2pixmap(img):
+    if img.mode == "RGB":
+        r, g, b = img.split()
+        img = Image.merge("RGB", (b, g, r))
+    elif  img.mode == "RGBA":
+        r, g, b, a = img.split()
+        img = Image.merge("RGBA", (b, g, r, a))
+    elif img.mode == "L":
+        img = img.convert("RGBA")
+    img2 = img.convert("RGBA")
+    data = img2.tobytes("raw", "RGBA")
+    qimg = QtGui.QImage(data, img.size[0], img.size[1], QtGui.QImage.Format_ARGB32)
+    pixmap = QtGui.QPixmap.fromImage(qimg)
+    return pixmap
 
 
 def make_video(

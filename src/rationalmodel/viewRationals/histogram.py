@@ -36,18 +36,16 @@ class Scene:
         self.height: int = height
         self.min_x = 0.
         self.max_x = 0.
-        self.max_h = 0.
         self.y_factor = y_factor
         self.ox: float = width / 2
         self.scl: float = 1.
         self.items: list[Item] = []
         self.select_area = None
 
-    def clear(self, max_h=1.):
+    def clear(self):
         self.items = []
         self.max_x = 0.
-        self.max_h = max_h
-
+        
     def add(self, x: int, height: int, color: vec3, count: int):
         self.items.append(Item(x, height, color, count))
         if x > self.max_x: self.max_x = x
@@ -89,7 +87,7 @@ class Scene:
         return int(np.power(a, int(self._loga(a, x))))
     
     def _get_y_step_max(self, y_base):
-        y_step = int(self._loga_round(y_base, self.max_h))
+        y_step = int(self._loga_round(y_base, 1.0))
         y_step = y_step if y_step > 0 else 1
         y_max = y_step * np.power(y_base, 2)
         return int(y_step), int(y_max)
@@ -222,6 +220,7 @@ class Histogram(QtWidgets.QWidget):
         self.spacetime: SpaceTime = None
         self.time = 0
         self.number = 0
+        self.number_str = ''
         self.accumulate = False
         self.moving = False
         if not parent:
@@ -268,7 +267,7 @@ class Histogram(QtWidgets.QWidget):
         if self.number != number:
             self.change_flag = True
         self.number = number
-        self.scene.clear(number)
+        self.scene.clear()
 
     def set_spacetime(self, spacetime):
         if not spacetime:
