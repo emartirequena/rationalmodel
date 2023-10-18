@@ -1,12 +1,10 @@
 import os
 import sys
-import time
 import math
 import shutil
 from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
-import typing
 from PyQt5.QtWidgets import QWidget
 
 from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3, text
@@ -14,12 +12,15 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from PIL import Image, ImageDraw, ImageFont
 
+from mainWindowUi import MainWindowUI
+from mainView import MainView
+from renderView import RenderView
+from saveSpecials import SaveSpecialsWidget
 from spacetime import SpaceTime
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video, timing
 from config import Config
 from color import ColorLine
-from renderView import RenderView
 from histogram import Histogram
 
 settings_file = r'settings.txt'
@@ -27,97 +28,11 @@ settings_file = r'settings.txt'
 opengl_version = (3,3)
 
 
-class MainView(rendering.View):
-    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene: rendering.Scene, projection: rendering.Perspective | rendering.Orthographic, parent: QtWidgets.QWidget=None):
-        self.mainWindow = mainWindow
-        super().__init__(scene, projection=projection, parent=parent)
-
-    def mouseClick(self, evt):
-        obj = self.itemat(QtCore.QPoint(evt.x(), evt.y()))
-        if obj:
-            center = self.scene.item(obj).box.center
-            t = self.mainWindow.timeWidget.value()
-            spacetime = self.mainWindow.spacetime
-            if spacetime:
-                if self.mainWindow.dim == 2:
-                    x = center.x
-                    y = center.z
-                    z = 0.0
-                else:
-                    x = center.x
-                    y = center.y
-                    z = center.z
-                cell = spacetime.getCell(t, x, y, z, accumulate=self.mainWindow._check_accumulate())
-                if not cell:
-                    return False
-                count = cell.count
-                self.mainWindow.select_cells(count)
-                self.mainWindow.refresh_selection()
-            return True
-        return False
-
-    def control(self, _, evt):
-        if evt.type() == 3:
-            return self.mouseClick(evt)
-        return False
-
-
-class SaveSpecialsWidget(QtWidgets.QDialog):
-    def __init__(self, parent, current_period, maximum_period) -> None:
-        super().__init__(parent)
-        
-        self.vlayout = QtWidgets.QVBoxLayout()
-        self.gridlayout = QtWidgets.QGridLayout()
-        self.vlayout.addLayout(self.gridlayout)
-
-        self.label1 = QtWidgets.QLabel('Init period')
-        self.gridlayout.addWidget(self.label1, 0, 0)
-        self.init_period = QtWidgets.QSpinBox(self)
-        self.init_period.setMinimum(1)
-        self.init_period.setMaximum(maximum_period)
-        self.init_period.setValue(current_period)
-        self.gridlayout.addWidget(self.init_period, 0, 1)
-
-        self.label2 = QtWidgets.QLabel('End period')
-        self.gridlayout.addWidget(self.label2, 1, 0)
-        self.end_period = QtWidgets.QSpinBox(self)
-        self.end_period.setMinimum(1)
-        self.end_period.setMaximum(maximum_period)
-        self.end_period.setValue(maximum_period)
-        self.gridlayout.addWidget(self.end_period, 1, 1)
-
-        self.label3 = QtWidgets.QLabel('Subfolder')
-        self.gridlayout.addWidget(self.label3, 2, 0)
-        self.subfolder = QtWidgets.QLineEdit(self)
-        self.gridlayout.addWidget(self.subfolder, 2, 1)
-
-        self.hlayout = QtWidgets.QHBoxLayout()
-        self.hlayout.addStretch()
-        self.button_save = QtWidgets.QPushButton('Save Specials', self)
-        self.button_save.clicked.connect(self.save)
-        self.hlayout.addWidget(self.button_save)
-        
-        self.button_cancel = QtWidgets.QPushButton('Cancel', self)
-        self.button_cancel.clicked.connect(self.close)
-        self.hlayout.addWidget(self.button_cancel)
-
-        self.vlayout.addLayout(self.hlayout)
-        self.setLayout(self.vlayout)
-
-        self.setWindowTitle('Save specials')
-
-    def save(self):
-        if self.end_period.value() <= self.init_period.value():
-            QtWidgets.QErrorMessage(self, 'End period must be greater than init period')
-            return
-        self.close()
-        self.parent().saveSpecialsNumbers(self.init_period.value(), self.end_period.value(), self.subfolder.text())
-
-
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setUpUi()
+        self.ui = MainWindowUI()
+        self.ui.setUpUi(self)
         self.dim = 3
         self.count = 0
         self.objs = {}
@@ -146,218 +61,6 @@ class MainWindow(QtWidgets.QMainWindow):
             for knot in colors:
                 self.color.add(knot['alpha'], vec3(*knot['color']))
         
-    def setUpUi(self):
-        self.resize(1920, 1080)
-
-        self.setWindowTitle('View 3D Spacetime Rational Sets')
-
-        self.mainLayout = QtWidgets.QHBoxLayout()
-        self.leftLayout = QtWidgets.QVBoxLayout()
-        self.rightLayout = QtWidgets.QVBoxLayout()
-        self.mainLayout.addLayout(self.leftLayout, 10)
-        self.mainLayout.addLayout(self.rightLayout, 1)
-        
-        self.viewLayout = QtWidgets.QVBoxLayout()
-        self.timeLayout = QtWidgets.QHBoxLayout()
-        
-        self.leftLayout.addLayout(self.viewLayout, 10)
-        self.leftLayout.addLayout(self.timeLayout, 1)
-
-        self.timeWidget = QtWidgets.QSlider(Qt.Horizontal)
-        self.timeWidget.setMinimum(0)
-        self.timeWidget.setMaximum(100)
-        self.timeWidget.setTickInterval(1)
-        self.timeWidget.setTickPosition(QtWidgets.QSlider.TicksAbove)
-        self.timeWidget.valueChanged.connect(self.make_objects)
-        self.timeLayout.addWidget(self.timeWidget)
-
-        self.time = QtWidgets.QSpinBox(self)
-        self.time.setMinimumWidth(40)
-        self.time.setMinimum(0)
-        self.time.setMaximum(10000)
-        self.time.valueChanged.connect(self.timeWidget.setValue)
-        self.timeWidget.valueChanged.connect(self.time.setValue)
-        self.time.setValue(0)
-        self.timeLayout.addWidget(self.time)
-
-        self.gridLayout = QtWidgets.QGridLayout()
-
-        self.dimLabel = QtWidgets.QLabel('Dimension')
-        self.gridLayout.addWidget(self.dimLabel, 0, 0)
-        self.dimLayout = QtWidgets.QHBoxLayout()
-        self.button1D = QtWidgets.QPushButton('1D', self)
-        self.button1D.setMaximumWidth(50)
-        self.button1D.setMinimumHeight(20)
-        self.button1D.clicked.connect(self.set1D)
-        self.dimLayout.addWidget(self.button1D)
-        self.button2D = QtWidgets.QPushButton('2D', self)
-        self.button2D.setMaximumWidth(50)
-        self.button2D.setMinimumHeight(20)
-        self.button2D.clicked.connect(self.set2D)
-        self.dimLayout.addWidget(self.button2D)
-        self.button3D = QtWidgets.QPushButton('3D', self)
-        self.button3D.setMaximumWidth(50)
-        self.button3D.setMinimumHeight(20)
-        self.button3D.clicked.connect(self.set3D)
-        self.dimLayout.addWidget(self.button3D)
-        self.gridLayout.addLayout(self.dimLayout, 0, 1)
-
-        self.label1 = QtWidgets.QLabel('Period')
-        self.gridLayout.addWidget(self.label1, 1, 0)
-        self.period = QtWidgets.QSpinBox(self)
-        self.period.setMinimum(1)
-        self.period.setMaximum(100)
-        self.period.valueChanged.connect(self.get_period_factors)
-        self.gridLayout.addWidget(self.period, 1, 1)
-
-        self.label2 = QtWidgets.QLabel('Max Time')
-        self.gridLayout.addWidget(self.label2, 2, 0)
-        self.maxTime = QtWidgets.QSpinBox(self)
-        self.maxTime.valueChanged.connect(self.timeWidget.setMaximum)
-        # self.maxTime.valueChanged.connect(self.timeWidget.setValue)
-        self.maxTime.valueChanged.connect(self.maxTimeChanged)
-        self.maxTime.setMinimum(0)
-        self.maxTime.setMaximum(10000)
-        self.gridLayout.addWidget(self.maxTime, 2, 1)
-
-        self.label3 = QtWidgets.QLabel('Number')
-        self.gridLayout.addWidget(self.label3, 3, 0)
-        self.number = QtWidgets.QDoubleSpinBox(self)
-        self.number.setMinimum(0)
-        self.number.setDecimals(0)
-        self.number.setMaximum(18446744073709551615)
-        self.number.setEnabled(False)
-        self.gridLayout.addWidget(self.number, 3, 1)
-
-        self.label4 = QtWidgets.QLabel('Factors')
-        self.gridLayout.addWidget(self.label4, 4, 0)
-        self.factorsLabel = QtWidgets.QLabel()
-        self.factorsLabel.setWordWrap(True)
-        self.gridLayout.addWidget(self.factorsLabel, 4, 1)
-
-        self.factorsLayout = QtWidgets.QVBoxLayout()
-        self.gridLayout.addLayout(self.factorsLayout, 5, 0)
-
-        self.label4 = QtWidgets.QLabel('Divisors')
-        self.gridLayout.addWidget(self.label4, 6, 0)
-        self.label_num_divisors = QtWidgets.QLabel('')
-        self.gridLayout.addWidget(self.label_num_divisors, 6, 1)
-
-        self.rightLayout.addLayout(self.gridLayout)
-
-        self.divisors = QtWidgets.QListWidget(self)
-        self.divisors.clicked.connect(self.setNumber)
-        self.rightLayout.addWidget(self.divisors)
-
-        self.accumulate = QtWidgets.QCheckBox('Accumulate', self)
-        self.accumulate.setCheckState(Qt.Unchecked)
-        self.rightLayout.addWidget(self.accumulate)
-
-        self.computeButton = QtWidgets.QPushButton('Compute', self)
-        self.rightLayout.addWidget(self.computeButton)
-        self.computeButton.clicked.connect(self.compute)
-
-        self.central = QtWidgets.QWidget(self)
-        self.setCentralWidget(self.central)
-        self.central.setLayout(self.mainLayout)
-
-        self.menu = self.menuBar()
-        self.mainMenu = QtWidgets.QMenu('Main')
-        self.actionExit = QtWidgets.QAction('Exit', self)
-        self.actionExit.setShortcut('Esc')
-        self.actionExit.triggered.connect(self.close)
-        self.mainMenu.addAction(self.actionExit)
-        self.menu.addMenu(self.mainMenu)
-
-        self.menuUtils = QtWidgets.QMenu('Utils')
-
-        self.actionSaveImage = QtWidgets.QAction('Save Image', self)
-        self.actionSaveImage.setShortcut('I')
-        self.actionSaveImage.triggered.connect(self.saveImage)
-        self.menuUtils.addAction(self.actionSaveImage)
-
-        self.actionSaveVideo = QtWidgets.QAction('Save Video', self)
-        self.actionSaveVideo.setShortcut('V')
-        self.actionSaveVideo.triggered.connect(self.saveVideo)
-        self.menuUtils.addAction(self.actionSaveVideo)
-
-        self.actionSaveSpecials = QtWidgets.QAction('Save Specials', self)
-        self.actionSaveSpecials.setShortcut('S')
-        self.actionSaveSpecials.triggered.connect(self.saveSpecials)
-        self.menuUtils.addAction(self.actionSaveSpecials)
-
-        self.menuUtils.addSeparator()
-
-        self.actionFitHistogram = QtWidgets.QAction('Fit Histogram', self)
-        self.actionFitHistogram.setShortcut('F')
-        self.actionFitHistogram.triggered.connect(self.fit_histogram)
-        self.menuUtils.addAction(self.actionFitHistogram)
-
-        self.actionViewHistogram = QtWidgets.QAction('View Histogram', self)
-        self.actionViewHistogram.setShortcut('H')
-        self.actionViewHistogram.setShortcutContext(QtCore.Qt.ApplicationShortcut)
-        self.actionViewHistogram.triggered.connect(self.set_view_histogram)
-        self.menuUtils.addAction(self.actionViewHistogram)
-
-        self.actionCenterView = QtWidgets.QAction('Center View', self)
-        self.actionCenterView.setShortcut('C')
-        self.actionCenterView.triggered.connect(self.center_view)
-        self.menuUtils.addAction(self.actionCenterView)
-        
-        self.menu.addMenu(self.menuUtils)
-
-        self.menuSelection = QtWidgets.QMenu('Selection')
-
-        self.actionSelectAll = QtWidgets.QAction('Select All', self)
-        self.actionSelectAll.setShortcut('A')
-        self.actionSelectAll.triggered.connect(self.select_all)
-        self.menuSelection.addAction(self.actionSelectAll)
-        
-        self.actionDeselectAll = QtWidgets.QAction('Deselect All', self)
-        self.actionDeselectAll.setShortcut('D')
-        self.actionDeselectAll.triggered.connect(self.deselect_all)
-        self.menuSelection.addAction(self.actionDeselectAll)
-        
-        self.actionInvertSelection = QtWidgets.QAction('Invert Selection', self)
-        self.actionInvertSelection.setShortcut('Shift+A')
-        self.actionInvertSelection.triggered.connect(self.invert_selection)
-        self.menuSelection.addAction(self.actionInvertSelection)
-
-        self.menu.addMenu(self.menuSelection)
-
-        self.menuTime = QtWidgets.QMenu('Time')
-
-        self.actionLeft = QtWidgets.QAction('Increment time', self.centralWidget())
-        self.actionLeft.setShortcut('Left')
-        self.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
-        self.actionLeft.triggered.connect(self.decrementTime)
-        self.menuTime.addAction(self.actionLeft)
-
-        self.actionRight = QtWidgets.QAction('Decrement time', self.centralWidget())
-        self.actionRight.setShortcut('Right')
-        self.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
-        self.actionRight.triggered.connect(self.incrementTime)
-        self.menuTime.addAction(self.actionRight)
-
-        self.actionInit = QtWidgets.QAction('Go to init', self.centralWidget())
-        self.actionInit.setShortcut('Home')
-        self.actionInit.setShortcutContext(QtCore.Qt.ApplicationShortcut)
-        self.actionInit.triggered.connect(self.setTimeInit)
-        self.menuTime.addAction(self.actionInit)
-
-        self.actionEnd = QtWidgets.QAction('Go to end', self.centralWidget())
-        self.actionEnd.setShortcut('End')
-        self.actionEnd.setShortcutContext(QtCore.Qt.ApplicationShortcut)
-        self.actionEnd.triggered.connect(self.setTimeEnd)
-        self.menuTime.addAction(self.actionEnd)
-
-        self.menu.addMenu(self.menuTime)
-
-        self.statusBar = QtWidgets.QStatusBar(self)
-        self.statusLabel = QtWidgets.QLabel()
-        self.statusBar.addWidget(self.statusLabel)
-        self.setStatusBar(self.statusBar)
-
     def _check_accumulate(self):
         return bool(self.accumulate.checkState())
 
@@ -608,6 +311,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.setStatus('Videos saved...')
 
     def saveImage(self, subfolder=''):
+        if subfolder == False: subfolder = ''
+        self.deselect_all()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         self._saveImages(self.time.value(), self.time.value(), subfolder)
         self.make_objects()
