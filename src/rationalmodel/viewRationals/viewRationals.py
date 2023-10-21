@@ -586,12 +586,13 @@ class MainWindow(QtWidgets.QMainWindow):
     def switch_3d_views(self):
         if not self.views:
             return
-        if self.views.mode == '3D':
-            self.views.set_mode('3DSPLIT')
-            self.views.initialize(self.objs)
-        elif self.views.mode == '3DSPLIT':
-            self.views.set_mode('3D')
-            self.views.initialize(self.objs)
+        names = ['3D', '3DSPLIT']
+        if not self.views.mode in names:
+            return
+        new_mode = names[(names.index(self.views.mode) + 1) % 2]
+        self.views.set_mode(new_mode)
+        self.views.initialize(self.objs)
+        self.views.update()
 
     def get_factors(self, number):
         factors = self.numbers[number]['factors']

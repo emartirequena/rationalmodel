@@ -37,7 +37,7 @@ class View(QtWidgets.QWidget):
 
     def initialize(self, objs):
         self.view.scene.displays.clear()
-        self.view.scene.update(objs)
+        self.view.scene.add(objs)
         self.view.scene.render(self.view)
         self.view.show()
         self.view.center()
@@ -46,9 +46,9 @@ class View(QtWidgets.QWidget):
         self.update()
 
     def reset(self, objs):
-        print(f'------- View {self.type} reset({len(objs)}) objs')
+        # print(f'------- View {self.type:7s} reset({len(objs)}) objs, ctx: {str(self.view.scene.ctx)}')
         self.view.scene.displays.clear()
-        self.view.scene.update(objs)
+        self.view.scene.add(objs)
         self.view.scene.render(self.view)
         self.view.show()
         self.view.update()
@@ -101,7 +101,7 @@ class View(QtWidgets.QWidget):
         self.view.update()
 
     def get_ctx(self):
-        return self.scene.ctx
+        return self.ctx
         
 
 class Views(QtWidgets.QWidget):
@@ -129,17 +129,21 @@ class Views(QtWidgets.QWidget):
     def set_mode(self, mode: str):
         if self.layout():
             for i in reversed(range(self.layout().count())):
+                # print(f'------- Views: remove {self.mode}')
                 if self.mode == '3DSPLIT':
-                    self.layout().itemAt(i).layout().setParent(None)
+                    layout = self.layout().itemAt(i).layout()
+                    for j in reversed(range(layout.count())):
+                        layout.itemAt(j).widget().setParent(None)
+                    layout.setParent(None)
                 else:
                     self.layout().itemAt(i).widget().setParent(None)
         else:
             self.main_layout = QtWidgets.QVBoxLayout(self)
-        self.update()
+            self.setLayout(self.main_layout)
 
         if mode == '3D':
             self.navigation = deepcopy(self.views['3DVIEW'].view.navigation)
-        elif mode == '3DVIEW':
+        elif mode == '3DSPLIT':
             self.navigation = deepcopy(self.views['3D'].view.navigation)
         else:
             self.navigation = None
@@ -148,12 +152,15 @@ class Views(QtWidgets.QWidget):
             view.set_active(False)
         
         if mode == '1D':
+            self.views['1D'] = View('1D', self.mainWindow, parent=self.parent)
             self.views['1D'].set_active(True)
             self.main_layout.addWidget(self.views['1D'])
         elif mode == '2D':
+            self.views['2D'] = View('2D', self.mainWindow, parent=self.parent)
             self.views['2D'].set_active(True)
             self.main_layout.addWidget(self.views['2D'])
         elif mode == '3D':
+            self.views['3D'] = View('3D', self.mainWindow, parent=self.parent)
             if self.navigation:
                 self.views['3D'].view.navigation = self.navigation
             self.views['3D'].set_active(True)
@@ -161,6 +168,7 @@ class Views(QtWidgets.QWidget):
         else:
             names = ['3DFRONT', '3DTOP', '3DLEFT', '3DVIEW']
             for name in names:
+                self.views[name] = View(name, self.mainWindow, parent=self.parent)
                 self.views[name].set_active(True)
                 if self.navigation and name == '3DVIEW':
                     self.views['3DVIEW'].view.navigation = self.navigation
