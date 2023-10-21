@@ -5,15 +5,15 @@ import shutil
 from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
-from PyQt5.QtWidgets import QWidget
 
-from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3, text
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from PIL import Image, ImageDraw, ImageFont
 
+from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3, text
+
 from mainWindowUi import MainWindowUI
-from mainView import MainView
+from views import Views
 from renderView import RenderView
 from saveSpecials import SaveSpecialsWidget
 from spacetime import SpaceTime
@@ -38,7 +38,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objs = {}
         self.cell_ids = {}
         self.selected = {}
-        self.view = None
+        self.views = None
         self.first_number_set = False
         self.changed_spacetime = True
         self.need_compute = True
@@ -66,17 +66,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _clear_view(self):
         self.first_number_set = False
-        if self.view:
-            if self.dim < 3:
-                self.view.projection = rendering.Orthographic()
-            else:
-                self.view.projection = rendering.Perspective()
-            self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
-            self.view.scene.displays.clear()
-            self.view.scene.add({})
-            self.view.center()
-            self.view.adjust()
-            self.view.update()
+        if self.views:
+            self.views.clear()
             if self.histogram:
                 self.histogram.clear()
         else:
@@ -93,20 +84,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self.divisors.clear()
         self.factorsLabel.setText('')
         self.label_num_divisors.setText('')
-        if self.histogram: 
+        if self.histogram:
             self.histogram.set_spacetime(None)
         pressed     = 'QPushButton {background-color: bisque;      color: red;    border-width: 1px; border-radius: 4px; border-style: outset; border-color: gray;}'
         not_pressed = 'QPushButton {background-color: floralwhite; color: black;  border-width: 1px; border-radius: 4px; border-style: outset; border-color: gray;}' \
                       'QPushButton:hover {background-color: lightgray; border-color: blue;}'
         if self.dim == 1:
+            if self.views:
+                self.views.set_mode('1D')
             self.button1D.setStyleSheet(pressed)
             self.button2D.setStyleSheet(not_pressed)
             self.button3D.setStyleSheet(not_pressed)
         elif self.dim == 2:
+            if self.views:
+                self.views.set_mode('2D')
             self.button1D.setStyleSheet(not_pressed)
             self.button2D.setStyleSheet(pressed)
             self.button3D.setStyleSheet(not_pressed)
         elif self.dim == 3:
+            if self.views:
+                self.views.set_mode('3DSPLIT')
             self.button1D.setStyleSheet(not_pressed)
             self.button2D.setStyleSheet(not_pressed)
             self.button3D.setStyleSheet(pressed)
@@ -329,18 +326,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
-            if len(self.view.scene.item([0])) == 1:
-                disp = self.view.scene.item([0])[0].displays[id]
-            else:
-                disp = self.view.scene.item([0])[id]
-            if type(disp).__name__ in ('SolidDisplay', 'WebDisplay'):
-                if self.dim == 2:
-                    disp.vertices.selectsub(1)
-                else:
-                    disp.vertices.selectsub(0)
-                disp.selected = state if state is not None else not any(disp.vertices.flags & 0x1)
-            else:
-                disp.selected = state if state is not None else not disp.selected
+            self.views.switch_display_id(id, state=state)
 
     def select_cells(self, count):
         if not count:
@@ -383,8 +369,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def refresh_selection(self):
         self.print_selection()
-        if self.view:
-            self.view.update()
+        if self.views:
+            self.views.update()
         if self.histogram:
             self.histogram.display_all()
             self.histogram.update()
@@ -428,6 +414,7 @@ class MainWindow(QtWidgets.QMainWindow):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
         self.deselect_all()
+        self.views.clear()
 
         if self.changed_spacetime:
             if self.spacetime is not None:
@@ -546,28 +533,15 @@ class MainWindow(QtWidgets.QMainWindow):
             return self.objs
 
     def make_view(self, frame):
-        if not self.view:
+        if not self.views:
             print("view doesn't exists...")
-            if self.dim < 3:
-                projection = rendering.Orthographic()
-            else:
-                projection = rendering.Perspective()
-            scene = rendering.Scene(self.objs, options=None)
-            self.view = MainView(self, scene, projection=projection)
-            self.viewLayout.addWidget(self.view)
-            self.view.show()
-            self.view.center()
-            self.view.adjust()
-            self.view.update()
+            self.views = Views(self, parent=self)
+            self.viewLayout.addWidget(self.views)
             
         elif not self.first_number_set:
             print('first number set...')
             self.first_number_set = True
-            self.view.scene.update(self.objs)
-            self.view.scene.render(self.view)
-            self.view.show()
-            self.view.center()
-            self.view.adjust()
+            self.views.initialize(self.objs)
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
@@ -577,19 +551,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         else:
             print('continue setting number...')
-            self.view.scene.displays.clear()
-            self.view.scene.add(self.objs)
-            self.view.scene.render(self.view)
-            self.view.show()
-            self.view.update()
+            self.views.reset(self.objs)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
             self.histogram.set_time(frame, self._check_accumulate())
             if self.view_histogram:
                 self.histogram.show()
-
-        del self.objs
-        self.objs = {}
+        
         gc.collect()
         self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
 
@@ -611,12 +579,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.histogram.update()
 
     def center_view(self):
-        if not self.view:
+        if not self.views:
             return
-        self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
-        self.view.center()
-        self.view.adjust()
-        self.view.update()
+        self.views.center()
+
+    def switch_3d_views(self):
+        if not self.views:
+            return
+        if self.views.mode == '3D':
+            self.views.set_mode('3DSPLIT')
+            self.views.initialize(self.objs)
+        elif self.views.mode == '3DSPLIT':
+            self.views.set_mode('3D')
+            self.views.initialize(self.objs)
 
     def get_factors(self, number):
         factors = self.numbers[number]['factors']
@@ -661,7 +636,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cycles = (4 if T < 8 else (3 if T < 17 else 2))
         self.maxTime.setValue(T * self.cycles)
         self.maxTime.setSingleStep(T)
-        self.setStatus('Divisors computed. Select now a number on the list and press \bCompute\b button')
+        self.setStatus('Divisors computed. Select now a number from the list and press the Compute button')
 
     def fillDivisors(self, T: int):
         a = int(2 ** self.dim)
@@ -711,7 +686,7 @@ class MainWindow(QtWidgets.QMainWindow):
         widget = SaveSpecialsWidget(self, self.period.value(), 61)
         widget.show()
 
-    def saveSpecialsNumbers(self, init_period, end_period, subfolder):
+    def saveSpecialNumbers(self, init_period, end_period, subfolder):
         self.accumulate.setChecked(True)
         for period in range(init_period, end_period + 1, 2):
             if 46 <= period <= 48 and self.dim == 3:
@@ -738,7 +713,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
-    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, True)
+    QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, False)
     app = QtWidgets.QApplication(sys.argv)
     freeze_support()
     settings.load(settings_file)

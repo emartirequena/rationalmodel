@@ -44,7 +44,7 @@ class Space(object):
 		self.dim = dim
 		self.name = name
 		self.base = 2**dim
-		self.cells = []
+		self.cells: list[Cell] = []
 		if self.dim == 1:
 			for nx in range(t + 1):
 				x = c * t - nx
@@ -78,7 +78,7 @@ class Space(object):
 		return self.cells[int(n)]
 	
 	def getCells(self):
-		return list(filter(lambda x: x.count != 0, self.cells))
+		return list(filter(lambda x: x.count > 0, self.cells))
 
 	def add(self, x, y=0.0, z=0.0):
 		cell = self.getCell(x, y, z)
@@ -154,6 +154,8 @@ class Spaces:
 	def clear(self):
 		for space in self.spaces:
 			space.clear()
+		self.accumulates_even.clear()
+		self.accumulates_odd.clear()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		if not accumulate:
@@ -191,20 +193,6 @@ def create_rational(args):
 	return Rational(m, n, dim)
 
 
-# def add_rational(args):
-# 	conn, max, dim, r, t, x, y, z = args
-# 	r = args[3]
-# 	for rt in range(0, max + 1):
-# 		pos = list(r.position(rt))
-# 		pos[0] += x
-# 		if dim > 1:
-# 			pos[1] += y
-# 		if dim > 2:
-# 			pos[2] += z
-# 		conn.send((t+rt, *pos))
-# 	conn.send(None)
-
-
 class SpaceTime(object):
 	def __init__(self, T, max, dim=1):
 		self.T = T
@@ -225,6 +213,7 @@ class SpaceTime(object):
 		self.spaces.add(t, is_special, x, y , z)
 
 	def clear(self):
+		print('Spacetime Clear()...')
 		self.spaces.clear()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
@@ -262,32 +251,6 @@ class SpaceTime(object):
 			self.spaces.add(is_special, t+rt, self.T, *pos)
 
 	def addRationalSet(self, is_special=False, t=0, x=0, y=0, z=0):
-		# p = Pool(cpu_count())
-		# params = []
-		# connections = []
-		# for r in self.rationalSet:
-		# 	conn1, conn2 = Pipe()
-		# 	connections.append((conn1, conn2))
-		# 	params.append((conn1, self.max, self.dim, r, t, x, y, z))
-		# p.imap(func=add_rational, iterable=params, chunksize=1000)
-		# print('------ connections created...')
-
-		# count = 0
-		# while True:
-		# 	for connection in connections:
-		# 		conn1, conn2 = connection
-		# 		obj = conn2.recv()
-		# 		if obj is None:
-		# 			count += 1
-		# 		else:
-		# 			t, x, y, z = obj
-		# 			self.add(t, x, y, z)
-		# 	if count == len(params):
-		# 		break
-
-		# p.close()
-		# p.join()
-
 		for r in self.rationalSet:
 			self.add_rational(r, t, x, y, z, is_special)
 

@@ -49,6 +49,6 @@ class SaveSpecialsWidget(QtWidgets.QDialog):
             QtWidgets.QErrorMessage(self, 'End period must be greater than init period')
             return
         self.close()
-        self.parent().saveSpecialsNumbers(self.init_period.value(), self.end_period.value(), self.subfolder.text())
+        self.parent().saveSpecialNumbers(self.init_period.value(), self.end_period.value(), self.subfolder.text())
 
 
