@@ -103,7 +103,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.button3D.setStyleSheet(not_pressed)
         elif self.dim == 3:
             if self.views:
-                self.views.set_mode('3DSPLIT')
+                self.views.set_mode(self.views.get_mode_3d())
             self.button1D.setStyleSheet(not_pressed)
             self.button2D.setStyleSheet(not_pressed)
             self.button3D.setStyleSheet(pressed)
@@ -583,11 +583,11 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.views.center()
 
-    def switch_3d_views(self):
+    def swap_3d_views(self):
         if not self.views:
             return
         names = ['3D', '3DSPLIT']
-        if not self.views.mode in names:
+        if not self.views.get_mode() in names:
             return
         new_mode = names[(names.index(self.views.mode) + 1) % 2]
         self.views.set_mode(new_mode)

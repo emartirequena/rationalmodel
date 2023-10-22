@@ -162,7 +162,7 @@ class MainWindowUI:
         
         mainWindow.actionSwitchView = QtWidgets.QAction('Switch 3D View', mainWindow)
         mainWindow.actionSwitchView.setShortcut('Space')
-        mainWindow.actionSwitchView.triggered.connect(mainWindow.switch_3d_views)
+        mainWindow.actionSwitchView.triggered.connect(mainWindow.swap_3d_views)
         mainWindow.menuUtils.addAction(mainWindow.actionSwitchView)
         
         mainWindow.menu.addMenu(mainWindow.menuUtils)

@@ -108,13 +108,14 @@ class Views(QtWidgets.QWidget):
     def __init__(self, mainWindow, parent=None) -> None:
         super().__init__(parent=parent)
         self.mode = ''
+        self.mode_3d = '3DSPLIT'
         self.views = {}
         self.mainWindow = mainWindow
         self.navigation = None
         self.main_layout = None
         self.parent = parent
         self.init_views()
-        self.set_mode('3DSPLIT')
+        self.set_mode(self.mode_3d)
 
     def init_views(self):
         self.views = {}
@@ -165,6 +166,7 @@ class Views(QtWidgets.QWidget):
                 self.views['3D'].view.navigation = self.navigation
             self.views['3D'].set_active(True)
             self.main_layout.addWidget(self.views['3D'])
+            self.mode_3d = '3D'
         else:
             names = ['3DFRONT', '3DTOP', '3DLEFT', '3DVIEW']
             for name in names:
@@ -182,10 +184,17 @@ class Views(QtWidgets.QWidget):
             self.down_layout.setContentsMargins(0, 0, 0, 0)
             self.main_layout.addLayout(self.up_layout)
             self.main_layout.addLayout(self.down_layout)
+            self.mode_3d = '3DSPLIT'
         
         self.main_layout.setContentsMargins(0, 0, 0, 0)
         self.mode = mode
         self.update()
+
+    def get_mode(self):
+        return self.mode
+    
+    def get_mode_3d(self):
+        return self.mode_3d
 
     def initialize(self, objs):
         for view in self.views.values():
