@@ -6,7 +6,7 @@ class MainWindowUI:
     def setUpUi(self, mainWindow: QtWidgets.QMainWindow):
         mainWindow.resize(1920, 1080)
 
-        mainWindow.setWindowTitle('View 3D Spacetime Rational Sets')
+        mainWindow.setWindowTitle('View Rationals Sets Spacetime Distribution')
 
         mainWindow.mainLayout = QtWidgets.QHBoxLayout()
         mainWindow.leftLayout = QtWidgets.QVBoxLayout()

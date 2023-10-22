@@ -591,7 +591,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         new_mode = names[(names.index(self.views.mode) + 1) % 2]
         self.views.set_mode(new_mode)
-        self.views.initialize(self.objs)
+        self.views.reinit(self.objs)
         self.views.update()
 
     def get_factors(self, number):

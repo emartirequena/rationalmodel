@@ -1,36 +1,41 @@
 from copy import deepcopy
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5 import QtWidgets
 from madcad import rendering
 import numpy as np
 
-from mainView import MainView
+from screenView import ScreenView
 from renderView import RenderView
 
 
 class View(QtWidgets.QWidget):
-    def __init__(self, type: str, mainWidnow, ctx=None, parent=None) -> None:
-        super().__init__(parent=parent)
+    def __init__(self, type: str, mainWidnow, parent=None) -> None:
+        super().__init__()
         self.type = type
-        self.ctx = ctx
-        self.scene = rendering.Scene(ctx=ctx)
+        self.scene = rendering.Scene()
         self.active = False
-        if type in ['3D', '3DVIEW']:
-            projection = rendering.Perspective()
-        else:
-            projection = rendering.Orthographic()
-        if 'LEFT' in self.type:
-            navigation = rendering.Turntable(yaw=np.deg2rad(90), pitch=0)
-        elif 'TOP' in self.type:
-            navigation = rendering.Turntable(yaw=0, pitch=np.deg2rad(90))
-        else:
-            navigation = rendering.Turntable(yaw=0, pitch=0)
-        self.view = MainView(mainWindow=mainWidnow, scene=self.scene, projection=projection, navigation=navigation)
+        self.view = ScreenView(mainWindow=mainWidnow, scene=self.scene, parent=parent)
+        self.set_projection()
+        self.set_navigation()
         self.layout = QtWidgets.QHBoxLayout()
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.layout.addWidget(self.view)
         self.setLayout(self.layout)
         self.setContentsMargins(0, 0, 0, 0)
+
+    def set_projection(self):
+        if self.type in ['3D', '3DVIEW']:
+            self.view.projection = rendering.Perspective(fov=np.deg2rad(30))
+        else:
+            self.view.projection = rendering.Orthographic()
+
+    def set_navigation(self):
+        if 'LEFT' in self.type:
+            self.view.navigation = rendering.Turntable(yaw=np.deg2rad(90), pitch=0)
+        elif 'TOP' in self.type:
+            self.view.navigation = rendering.Turntable(yaw=0, pitch=np.deg2rad(90))
+        else:
+            self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
 
     def set_active(self, active: bool):
         self.active = active
@@ -45,8 +50,18 @@ class View(QtWidgets.QWidget):
         self.view.update()
         self.update()
 
+    def reinit(self, objs):
+        self.view.scene.displays.clear()
+        self.view.scene.add(objs)
+        self.view.scene.render(self.view)
+        self.view.show()
+        if self.type not in ['3D', '3DVIEW']:
+            self.view.center()
+            self.view.adjust()
+        self.view.update()
+        self.update()
+
     def reset(self, objs):
-        # print(f'------- View {self.type:7s} reset({len(objs)}) objs, ctx: {str(self.view.scene.ctx)}')
         self.view.scene.displays.clear()
         self.view.scene.add(objs)
         self.view.scene.render(self.view)
@@ -55,31 +70,18 @@ class View(QtWidgets.QWidget):
         self.update()
 
     def center(self):
-        if 'LEFT' in self.type:
-            self.view.navigation = rendering.Turntable(yaw=np.deg2rad(90), pitch=0)
-        elif 'TOP' in self.type:
-            self.view.navigation = rendering.Turntable(yaw=0, pitch=np.deg2rad(90))
-        else:
-            self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
+        self.set_projection()
+        self.set_navigation()
         self.view.center()
         self.view.adjust()
         self.view.update()
         self.update()
 
     def clear(self):
-        if self.type in ['3D', '3DVIEW']:
-            self.view.projection = rendering.Perspective()
-        else:
-            self.view.projection = rendering.Orthographic()
-        if 'LEFT' in self.type:
-            self.view.navigation = rendering.Turntable(yaw=np.deg2rad(90), pitch=0)
-        elif 'TOP' in self.type:
-            self.view.navigation = rendering.Turntable(yaw=0, pitch=np.deg2rad(90))
-        else:
-            self.view.navigation = rendering.Turntable(yaw=0, pitch=0)
+        self.set_projection()
+        self.set_navigation()
         self.view.center()
         self.view.adjust()
-
         self.view.scene.displays.clear()
         self.view.scene.update({})
         self.view.update()
@@ -112,6 +114,7 @@ class Views(QtWidgets.QWidget):
         self.views = {}
         self.mainWindow = mainWindow
         self.navigation = None
+        self.projection = None
         self.main_layout = None
         self.parent = parent
         self.init_views()
@@ -119,18 +122,16 @@ class Views(QtWidgets.QWidget):
 
     def init_views(self):
         self.views = {}
-        self.views['1D'] = View('1D', self.mainWindow, None, parent=self.parent)
-        self.ctx = self.views['1D'].get_ctx()
-        self.views['2D'] = View('2D', self.mainWindow, ctx=self.ctx, parent=self.parent)
-        self.views['3D'] = View('3D', self.mainWindow, ctx=self.ctx, parent=self.parent)
+        self.views['1D'] = View('1D', self.mainWindow, parent=self.parent)
+        self.views['2D'] = View('2D', self.mainWindow, parent=self.parent)
+        self.views['3D'] = View('3D', self.mainWindow, parent=self.parent)
         names = ['3DFRONT', '3DTOP', '3DLEFT', '3DVIEW']
         for name in names:
-            self.views[name] = View(name, self.mainWindow, ctx=self.ctx, parent=self.parent)
+            self.views[name] = View(name, self.mainWindow, parent=self.parent)
 
     def set_mode(self, mode: str):
         if self.layout():
             for i in reversed(range(self.layout().count())):
-                # print(f'------- Views: remove {self.mode}')
                 if self.mode == '3DSPLIT':
                     layout = self.layout().itemAt(i).layout()
                     for j in reversed(range(layout.count())):
@@ -144,8 +145,10 @@ class Views(QtWidgets.QWidget):
 
         if mode == '3D':
             self.navigation = deepcopy(self.views['3DVIEW'].view.navigation)
+            self.projection = deepcopy(self.views['3DVIEW'].view.projection)
         elif mode == '3DSPLIT':
             self.navigation = deepcopy(self.views['3D'].view.navigation)
+            self.projection = deepcopy(self.views['3D'].view.projection)
         else:
             self.navigation = None
 
@@ -164,6 +167,7 @@ class Views(QtWidgets.QWidget):
             self.views['3D'] = View('3D', self.mainWindow, parent=self.parent)
             if self.navigation:
                 self.views['3D'].view.navigation = self.navigation
+                self.views['3D'].view.projection = self.projection
             self.views['3D'].set_active(True)
             self.main_layout.addWidget(self.views['3D'])
             self.mode_3d = '3D'
@@ -174,6 +178,7 @@ class Views(QtWidgets.QWidget):
                 self.views[name].set_active(True)
                 if self.navigation and name == '3DVIEW':
                     self.views['3DVIEW'].view.navigation = self.navigation
+                    self.views['3DVIEW'].view.projection = self.projection
             self.up_layout = QtWidgets.QHBoxLayout()
             self.down_layout = QtWidgets.QHBoxLayout()
             self.up_layout.addWidget(self.views['3DTOP'])
@@ -200,6 +205,11 @@ class Views(QtWidgets.QWidget):
         for view in self.views.values():
             if view.active:
                 view.initialize(objs)
+
+    def reinit(self, objs):
+        for view in self.views.values():
+            if view.active:
+                view.reinit(objs)
 
     def reset(self, objs):
         for view in self.views.values():
