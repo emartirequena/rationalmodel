@@ -356,6 +356,12 @@ class MainWindow(QtWidgets.QMainWindow):
         gc.collect()       
         self.refresh_selection()
 
+    def reselect_cells(self):
+        for count in self.cell_ids:
+            if count in self.selected:
+                self._switch_display(count, True)
+        self.refresh_selection()
+
     def invert_selection(self):
         not_selected = {}
         for count in self.cell_ids:
@@ -583,7 +589,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         self.views.center()
 
-    def swap_3d_views(self):
+    def swap_3d_view(self):
         if not self.views:
             return
         names = ['3D', '3DSPLIT']
@@ -592,6 +598,7 @@ class MainWindow(QtWidgets.QMainWindow):
         new_mode = names[(names.index(self.views.mode) + 1) % 2]
         self.views.set_mode(new_mode)
         self.views.reinit(self.objs)
+        self.reselect_cells()
         self.views.update()
 
     def get_factors(self, number):
