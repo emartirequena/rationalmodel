@@ -188,13 +188,13 @@ class MainWindowUI:
 
         mainWindow.menuTime = QtWidgets.QMenu('Time')
 
-        mainWindow.actionLeft = QtWidgets.QAction('Increment time', mainWindow.centralWidget())
+        mainWindow.actionLeft = QtWidgets.QAction('Decrement time', mainWindow.centralWidget())
         mainWindow.actionLeft.setShortcut('Left')
         mainWindow.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         mainWindow.actionLeft.triggered.connect(mainWindow.decrementTime)
         mainWindow.menuTime.addAction(mainWindow.actionLeft)
 
-        mainWindow.actionRight = QtWidgets.QAction('Decrement time', mainWindow.centralWidget())
+        mainWindow.actionRight = QtWidgets.QAction('Increment time', mainWindow.centralWidget())
         mainWindow.actionRight.setShortcut('Right')
         mainWindow.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         mainWindow.actionRight.triggered.connect(mainWindow.incrementTime)

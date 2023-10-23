@@ -9,12 +9,12 @@ from renderView import RenderView
 
 
 class View(QtWidgets.QWidget):
-    def __init__(self, type: str, mainWidnow, parent=None) -> None:
+    def __init__(self, type: str, mainWindow, parent=None) -> None:
         super().__init__()
         self.type = type
         self.scene = rendering.Scene()
         self.active = False
-        self.view = ScreenView(mainWindow=mainWidnow, scene=self.scene, parent=parent)
+        self.view = ScreenView(mainWindow, self.scene, parent=parent)
         self.set_projection()
         self.set_navigation()
         self.layout = QtWidgets.QHBoxLayout()
@@ -40,21 +40,20 @@ class View(QtWidgets.QWidget):
     def set_active(self, active: bool):
         self.active = active
 
-    def initialize(self, objs):
-        self.view.scene.displays.clear()
-        self.view.scene.add(objs)
-        self.view.scene.render(self.view)
+    def load_objs(self, objs):
+        self.scene.sync(objs)
+        self.view.render()
         self.view.show()
+
+    def initialize(self, objs):
+        self.load_objs(objs)
         self.view.center()
         self.view.adjust()
         self.view.update()
         self.update()
 
     def reinit(self, objs):
-        self.view.scene.displays.clear()
-        self.view.scene.add(objs)
-        self.view.scene.render(self.view)
-        self.view.show()
+        self.load_objs(objs)
         if self.type not in ['3D', '3DVIEW']:
             self.view.center()
             self.view.adjust()
@@ -62,10 +61,7 @@ class View(QtWidgets.QWidget):
         self.update()
 
     def reset(self, objs):
-        self.view.scene.displays.clear()
-        self.view.scene.add(objs)
-        self.view.scene.render(self.view)
-        self.view.show()
+        self.load_objs(objs)
         self.view.update()
         self.update()
 
@@ -80,10 +76,10 @@ class View(QtWidgets.QWidget):
     def clear(self):
         self.set_projection()
         self.set_navigation()
-        self.view.center()
-        self.view.adjust()
         self.view.scene.displays.clear()
         self.view.scene.update({})
+        self.view.center()
+        self.view.adjust()
         self.view.update()
         self.update()
 
@@ -202,31 +198,37 @@ class Views(QtWidgets.QWidget):
         return self.mode_3d
 
     def initialize(self, objs):
+        view: View
         for view in self.views.values():
             if view.active:
                 view.initialize(objs)
 
     def reinit(self, objs):
+        view: View
         for view in self.views.values():
             if view.active:
                 view.reinit(objs)
 
     def reset(self, objs):
+        view: View
         for view in self.views.values():
             if view.active:
                 view.reset(objs)
 
     def center(self):
+        view: View
         for view in self.views.values():
             if view.active:
                 view.center()
 
     def clear(self):
+        view: View
         for view in self.views.values():
             if view.active:
                 view.clear()
 
     def switch_display_id(self, id, state=None):
+        view: View
         for view in self.views.values():
             if view.active:
                 view.switch_display_id(id, state=state)

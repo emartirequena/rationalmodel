@@ -3,7 +3,14 @@ from PyQt5 import QtCore, QtWidgets
 
 
 class ScreenView(rendering.View):
-    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene: rendering.Scene, projection: rendering.Perspective | rendering.Orthographic=None, navigation: rendering.Turntable | rendering.Orbit=None, parent: QtWidgets.QWidget=None):
+    def __init__(
+            self, 
+            mainWindow: QtWidgets.QMainWindow, 
+            scene: rendering.Scene, 
+            projection: rendering.Perspective | rendering.Orthographic | None=None, 
+            navigation: rendering.Turntable | rendering.Orbit | None=None, 
+            parent: QtWidgets.QWidget | None=None
+        ):
         self.mainWindow = mainWindow
         super().__init__(scene, projection=projection, navigation=navigation, parent=parent)
 

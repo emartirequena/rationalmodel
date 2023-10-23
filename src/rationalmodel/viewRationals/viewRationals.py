@@ -446,6 +446,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
+        self.first_number_set = False
         if self.time.value() != self.maxTime.value():
             self.time.setValue(self.maxTime.value())
         else:
@@ -494,6 +495,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.cell_ids = {}
         self.objs = {}
+        self.config.resetKey()
 
         for cell in view_cells:
             alpha = float(cell.count) / float(max)
