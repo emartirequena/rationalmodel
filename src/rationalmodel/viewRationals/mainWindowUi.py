@@ -6,7 +6,7 @@ class MainWindowUI:
     def setUpUi(self, mainWindow: QtWidgets.QMainWindow):
         mainWindow.resize(1920, 1080)
 
-        mainWindow.setWindowTitle('View 3D Spacetime Rational Sets')
+        mainWindow.setWindowTitle('View Rationals Sets Spacetime Distribution')
 
         mainWindow.mainLayout = QtWidgets.QHBoxLayout()
         mainWindow.leftLayout = QtWidgets.QVBoxLayout()
@@ -160,6 +160,11 @@ class MainWindowUI:
         mainWindow.actionCenterView.triggered.connect(mainWindow.center_view)
         mainWindow.menuUtils.addAction(mainWindow.actionCenterView)
         
+        mainWindow.actionSwapView = QtWidgets.QAction('Swap 3D View', mainWindow)
+        mainWindow.actionSwapView.setShortcut('Space')
+        mainWindow.actionSwapView.triggered.connect(mainWindow.swap_3d_view)
+        mainWindow.menuUtils.addAction(mainWindow.actionSwapView)
+        
         mainWindow.menu.addMenu(mainWindow.menuUtils)
 
         mainWindow.menuSelection = QtWidgets.QMenu('Selection')
@@ -183,13 +188,13 @@ class MainWindowUI:
 
         mainWindow.menuTime = QtWidgets.QMenu('Time')
 
-        mainWindow.actionLeft = QtWidgets.QAction('Increment time', mainWindow.centralWidget())
+        mainWindow.actionLeft = QtWidgets.QAction('Decrement time', mainWindow.centralWidget())
         mainWindow.actionLeft.setShortcut('Left')
         mainWindow.actionLeft.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         mainWindow.actionLeft.triggered.connect(mainWindow.decrementTime)
         mainWindow.menuTime.addAction(mainWindow.actionLeft)
 
-        mainWindow.actionRight = QtWidgets.QAction('Decrement time', mainWindow.centralWidget())
+        mainWindow.actionRight = QtWidgets.QAction('Increment time', mainWindow.centralWidget())
         mainWindow.actionRight.setShortcut('Right')
         mainWindow.actionRight.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         mainWindow.actionRight.triggered.connect(mainWindow.incrementTime)

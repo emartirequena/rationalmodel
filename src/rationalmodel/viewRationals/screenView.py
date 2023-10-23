@@ -2,10 +2,17 @@ from madcad import rendering
 from PyQt5 import QtCore, QtWidgets
 
 
-class MainView(rendering.View):
-    def __init__(self, mainWindow: QtWidgets.QMainWindow, scene: rendering.Scene, projection: rendering.Perspective | rendering.Orthographic, parent: QtWidgets.QWidget=None):
+class ScreenView(rendering.View):
+    def __init__(
+            self, 
+            mainWindow: QtWidgets.QMainWindow, 
+            scene: rendering.Scene, 
+            projection: rendering.Perspective | rendering.Orthographic | None=None, 
+            navigation: rendering.Turntable | rendering.Orbit | None=None, 
+            parent: QtWidgets.QWidget | None=None
+        ):
         self.mainWindow = mainWindow
-        super().__init__(scene, projection=projection, parent=parent)
+        super().__init__(scene, projection=projection, navigation=navigation, parent=parent)
 
     def mouseClick(self, evt):
         obj = self.itemat(QtCore.QPoint(evt.x(), evt.y()))
@@ -35,5 +42,4 @@ class MainView(rendering.View):
         if evt.type() == 3:
             return self.mouseClick(evt)
         return False
-
 
