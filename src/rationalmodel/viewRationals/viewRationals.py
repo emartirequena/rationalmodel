@@ -181,9 +181,6 @@ class MainWindow(QtWidgets.QMainWindow):
     def _saveImages(self, init_time, end_time, subfolder=''):
         self.setStatus('Saving images...')
         
-        projection = deepcopy(self.view.projection)
-        navigation = deepcopy(self.view.navigation)
-        
         number = int(self.number.value())
         period = self.period.value()
         factors = self.get_output_factors(number)
@@ -204,17 +201,11 @@ class MainWindow(QtWidgets.QMainWindow):
         video_codec = self.config.get('video_codec')
         bit_rate = self.config.get('bit_rate')
 
-        scene = rendering.Scene(options=None)
-        view = RenderView(scene, projection=projection, navigation=navigation)
-        view.resize((image_resx, image_resy))
-
         self.histogram.prepare_save_image()
 
         for time in range(init_time, end_time + 1):
-            scene.displays.clear()
             objs = self.make_objects(frame=time, make_view=False)
-            scene.add(objs)
-            img = view.render()
+            img = self.views.render(image_resx, image_resy, objs)
             
             file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
             if self.view_histogram:
@@ -233,14 +224,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 file_name = 'Accum_' + file_name
             img.save(os.path.join(path, file_name))
             
-            scene.displays.clear()
             del objs
             gc.collect()
-        
-        del projection
-        del navigation
-        del scene
-        del view
         
         self.histogram.end_save_image()
 
