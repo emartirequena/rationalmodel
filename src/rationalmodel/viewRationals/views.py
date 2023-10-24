@@ -3,6 +3,7 @@ from copy import deepcopy
 from PyQt5 import QtWidgets
 from madcad import rendering
 import numpy as np
+from PIL import Image, ImageDraw
 
 from screenView import ScreenView
 from renderView import RenderView
@@ -98,9 +99,20 @@ class View(QtWidgets.QWidget):
             disp.selected = state if state is not None else not disp.selected
         self.view.update()
 
-    def get_ctx(self):
-        return self.ctx
-        
+    def render(self, resx, resy, objs):
+        projection = deepcopy(self.view.projection)
+        navigation = deepcopy(self.view.navigation)
+
+        scene = rendering.Scene(options=None)
+        view = RenderView(scene, projection=projection, navigation=navigation)
+        if self.type not in ['3DVIEW', '3DLEFT', '3DTOP', '3DFRONT']:
+            view.resize((resx, resy))
+        else:
+            view.resize((resx // 2, resy // 2))
+        scene.displays.clear()
+        scene.add(objs)
+        return view.render()
+
 
 class Views(QtWidgets.QWidget):
     def __init__(self, mainWindow, parent=None) -> None:
@@ -232,3 +244,21 @@ class Views(QtWidgets.QWidget):
         for view in self.views.values():
             if view.active:
                 view.switch_display_id(id, state=state)
+
+    def render(self, resx, resy, objs):
+        if self.mode != '3DSPLIT':
+            return self.views[self.mode].render(resx, resy, objs)
+
+        background = Image.new('RGBA', (resx, resy), (180, 180, 180, 255))
+        draw = ImageDraw.Draw(background)
+        img_top = self.views['3DTOP'].render(resx, resy, objs)
+        img_front = self.views['3DFRONT'].render(resx, resy, objs)
+        img_left = self.views['3DLEFT'].render(resx, resy, objs)
+        img_view = self.views['3DVIEW'].render(resx, resy, objs)
+        background.alpha_composite(img_top,   dest=(0, 0))
+        background.alpha_composite(img_front, dest=(resx // 2, 0))
+        background.alpha_composite(img_left,  dest=(0, resy // 2))
+        background.alpha_composite(img_view,  dest=(resx // 2, resy // 2))
+        draw.line((resx // 2, 0, resx // 2, resy), (180, 180, 180, 255), width=4)
+        draw.line((0, resy // 2, resx, resy // 2), (180, 180, 180, 255), width=4)
+        return background
