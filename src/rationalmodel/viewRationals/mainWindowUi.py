@@ -137,6 +137,11 @@ class MainWindowUI:
         mainWindow.actionSaveVideo.triggered.connect(mainWindow.saveVideo)
         mainWindow.menuUtils.addAction(mainWindow.actionSaveVideo)
 
+        mainWindow.action3DTurntable = QtWidgets.QAction('3D Turntable', mainWindow)
+        mainWindow.action3DTurntable.setCheckable(True)
+        mainWindow.action3DTurntable.setChecked(False)
+        mainWindow.menuUtils.addAction(mainWindow.action3DTurntable)
+
         mainWindow.actionSaveSpecials = QtWidgets.QAction('Save Specials', mainWindow)
         mainWindow.actionSaveSpecials.setShortcut('S')
         mainWindow.actionSaveSpecials.triggered.connect(mainWindow.saveSpecials)

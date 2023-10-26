@@ -203,14 +203,31 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.histogram.prepare_save_image()
 
+        rotate = False
+        dx = 0.0
+        if self.views.mode in ['3D', '3DSPLIT'] and init_time != end_time and self.action3DTurntable.isChecked():
+            dx = 2.0 / float(end_time - init_time + 1)
+            if self._check_accumulate():
+                frame_rate = 12.5
+            rotate = True
+
         for time in range(init_time, end_time + 1):
-            objs = self.make_objects(frame=time, make_view=False)
+            if (
+                self.views.mode in ['3D', '3DSPLIT'] and 
+                init_time != end_time and 
+                self.action3DTurntable.isChecked() and 
+                self._check_accumulate()
+            ):
+                frame = self.time.value() % 2
+            else:
+                frame = time
+            objs = self.make_objects(frame=frame, make_view=False)
             img = self.views.render(image_resx, image_resy, objs)
             
             file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
-                hist_img = self.histogram.get_save_image(time)
+                hist_img = self.histogram.get_save_image(frame)
                 img.alpha_composite(hist_img)
                 if self._check_accumulate():
                     hist_name = 'Accum_' + hist_name
@@ -226,6 +243,13 @@ class MainWindow(QtWidgets.QMainWindow):
             
             del objs
             gc.collect()
+
+            if rotate:
+                if self.views.mode == '3D':
+                    name = '3D'
+                else:
+                    name = '3DVIEW'
+                self.views.views[name].view.navigation.rotate(dx, 0, 0)
         
         self.histogram.end_save_image()
 
@@ -303,7 +327,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def saveVideo(self):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         if self._check_accumulate():
-            self._saveImages(0, 6)
+            if self.views.mode not in ['3D', '3DSPLIT'] and not self.action3DTurntable.isChecked():
+                self._saveImages(0, 6)
+            else:
+                self._saveImages(0, 50)
         else:
             self._saveImages(0, self.maxTime.value())
         self.make_objects()
