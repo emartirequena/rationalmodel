@@ -112,6 +112,12 @@ class View(QtWidgets.QWidget):
         scene.displays.clear()
         scene.add(objs)
         return view.render()
+    
+    def rotate3DView(self, dx):
+        if self.type in ['3D', '3DVIEW']:
+            self.view.navigation.rotate(dx, 0, 0)
+            self.view.update()
+            self.update()
 
 
 class Views(QtWidgets.QWidget):
@@ -238,6 +244,15 @@ class Views(QtWidgets.QWidget):
         for view in self.views.values():
             if view.active:
                 view.clear()
+
+    def rotate3DView(self, dx):
+        if self.mode in ['3D', '3DSPLIT']:
+            if self.mode == '3D':
+                name = '3D'
+            else:
+                name = '3DVIEW'
+            self.views[name].rotate3DView(dx)
+            self.update()
 
     def switch_display_id(self, id, state=None):
         view: View
