@@ -39,6 +39,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.cell_ids = {}
         self.selected = {}
         self.views = None
+        self.timer = QtCore.QTimer(self)
+        self.timer.timeout.connect(self.rotate3DView)
+        self.turntable_speed = 0.01
         self.first_number_set = False
         self.changed_spacetime = True
         self.need_compute = True
@@ -75,6 +78,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objs = {}
         self.cell_ids = {}
         self.selected = {}
+        self.timer.stop()
 
     def _clear_parameters(self):
         self.period.setValue(1)
@@ -614,6 +618,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self.views.reinit(self.objs)
         self.reselect_cells()
         self.views.update()
+
+    def turntable(self):
+        if self.views.mode not in ['3D', '3DSPLIT']:
+            return
+        if self.timer.isActive():
+            self.timer.stop()
+            return
+        self.timer.start(40)
+
+    def rotate3DView(self):
+        if self.views.mode not in ['3D', '3DSPLIT']:
+            return
+        self.views.rotate3DView(self.turntable_speed)
+        self.update()
+
+    def turntableFaster(self):
+        self.turntable_speed *= 1.02
+
+    def turntableSlower(self):
+        self.turntable_speed /= 1.02
 
     def get_factors(self, number):
         factors = self.numbers[number]['factors']

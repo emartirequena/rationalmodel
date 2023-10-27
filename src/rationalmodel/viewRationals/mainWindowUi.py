@@ -137,10 +137,29 @@ class MainWindowUI:
         mainWindow.actionSaveVideo.triggered.connect(mainWindow.saveVideo)
         mainWindow.menuUtils.addAction(mainWindow.actionSaveVideo)
 
-        mainWindow.action3DTurntable = QtWidgets.QAction('3D Turntable', mainWindow)
+        mainWindow.action3DTurntable = QtWidgets.QAction('3D Turntable Video', mainWindow)
         mainWindow.action3DTurntable.setCheckable(True)
         mainWindow.action3DTurntable.setChecked(False)
         mainWindow.menuUtils.addAction(mainWindow.action3DTurntable)
+
+        mainWindow.menuUtils.addSeparator()
+
+        mainWindow.actionTurntable = QtWidgets.QAction('Start/Stop Turntable', mainWindow)
+        mainWindow.actionTurntable.setShortcut('T')
+        mainWindow.actionTurntable.triggered.connect(mainWindow.turntable)
+        mainWindow.menuUtils.addAction(mainWindow.actionTurntable)
+
+        mainWindow.actionTurntableFaster = QtWidgets.QAction('Turntable Faster', mainWindow)
+        mainWindow.actionTurntableFaster.setShortcut('+')
+        mainWindow.actionTurntableFaster.triggered.connect(mainWindow.turntableFaster)
+        mainWindow.menuUtils.addAction(mainWindow.actionTurntableFaster)
+
+        mainWindow.actionTurntableSlower = QtWidgets.QAction('Turntable Slower', mainWindow)
+        mainWindow.actionTurntableSlower.setShortcut('-')
+        mainWindow.actionTurntableSlower.triggered.connect(mainWindow.turntableSlower)
+        mainWindow.menuUtils.addAction(mainWindow.actionTurntableSlower)
+
+        mainWindow.menuUtils.addSeparator()
 
         mainWindow.actionSaveSpecials = QtWidgets.QAction('Save Specials', mainWindow)
         mainWindow.actionSaveSpecials.setShortcut('S')
