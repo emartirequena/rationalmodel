@@ -105,10 +105,10 @@ class View(QtWidgets.QWidget):
 
         scene = rendering.Scene(options=None)
         view = RenderView(scene, projection=projection, navigation=navigation)
-        if self.type not in ['3DVIEW', '3DLEFT', '3DTOP', '3DFRONT']:
-            view.resize((resx, resy))
-        else:
+        if self.type in ['3DVIEW', '3DLEFT', '3DTOP', '3DFRONT']:
             view.resize((resx // 2, resy // 2))
+        else:
+            view.resize((resx, resy))
         scene.displays.clear()
         scene.add(objs)
         return view.render()
@@ -118,6 +118,10 @@ class View(QtWidgets.QWidget):
             self.view.navigation.rotate(dx, 0, 0)
             self.view.update()
             self.update()
+
+    def rotate3DVideo(self, dx):
+        if self.type in ['3D', '3DVIEW']:
+            self.view.navigation.rotate(dx, 0, 0)
 
 
 class Views(QtWidgets.QWidget):
@@ -253,6 +257,14 @@ class Views(QtWidgets.QWidget):
                 name = '3DVIEW'
             self.views[name].rotate3DView(dx)
             self.update()
+
+    def rotate3DVideo(self, dx):
+        if self.mode in ['3D', '3DSPLIT']:
+            if self.mode == '3D':
+                name = '3D'
+            else:
+                name = '3DVIEW'
+            self.views[name].rotate3DVideo(dx)
 
     def switch_display_id(self, id, state=None):
         view: View
