@@ -41,7 +41,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.views = None
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.rotate3DView)
-        self.turntable_speed = 0.01
+        self.turntable_angle = 0.01
         self.first_number_set = False
         self.changed_spacetime = True
         self.need_compute = True
@@ -209,10 +209,15 @@ class MainWindow(QtWidgets.QMainWindow):
 
         rotate = False
         dx = 0.0
-        if self.views.mode in ['3D', '3DSPLIT'] and init_time != end_time and self.action3DTurntable.isChecked():
+        if (
+            self.views.mode in ['3D', '3DSPLIT'] and 
+            init_time != end_time and 
+            self.action3DTurntable.isChecked()
+        ):
             dx = 2.0 / float(end_time - init_time + 1)
             if self._check_accumulate():
                 frame_rate = 12.5
+                objs = self.make_objects(frame=self.time.value() % 2, make_view=False)
             rotate = True
 
         for time in range(init_time, end_time + 1):
@@ -225,7 +230,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 frame = self.time.value() % 2
             else:
                 frame = time
-            objs = self.make_objects(frame=frame, make_view=False)
+                objs = self.make_objects(frame=frame, make_view=False)
+                gc.collect()
             img = self.views.render(image_resx, image_resy, objs)
             
             file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
@@ -244,17 +250,11 @@ class MainWindow(QtWidgets.QMainWindow):
             if self._check_accumulate():
                 file_name = 'Accum_' + file_name
             img.save(os.path.join(path, file_name))
-            
-            del objs
-            gc.collect()
 
             if rotate:
-                if self.views.mode == '3D':
-                    name = '3D'
-                else:
-                    name = '3DVIEW'
-                self.views.views[name].view.navigation.rotate(dx, 0, 0)
-        
+                self.views.rotate3DVideo(dx)
+                self.setStatus(f'Saving frame {time} / {end_time - init_time}')
+            
         self.histogram.end_save_image()
 
         gc.collect()
@@ -331,10 +331,10 @@ class MainWindow(QtWidgets.QMainWindow):
     def saveVideo(self):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         if self._check_accumulate():
-            if self.views.mode not in ['3D', '3DSPLIT'] and not self.action3DTurntable.isChecked():
-                self._saveImages(0, 6)
-            else:
+            if self.views.mode in ['3D', '3DSPLIT'] and self.action3DTurntable.isChecked():
                 self._saveImages(0, 50)
+            else:
+                self._saveImages(0, 6)
         else:
             self._saveImages(0, self.maxTime.value())
         self.make_objects()
@@ -436,7 +436,7 @@ class MainWindow(QtWidgets.QMainWindow):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
 
         self.deselect_all()
-        self.views.clear()
+        # self.views.clear()
 
         if self.changed_spacetime:
             if self.spacetime is not None:
@@ -462,7 +462,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
-        self.first_number_set = False
+        # self.first_number_set = False
         if self.time.value() != self.maxTime.value():
             self.time.setValue(self.maxTime.value())
         else:
@@ -484,7 +484,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.deselect_all()
         
         view_cells = self.spacetime.getCells(frame, accumulate=self._check_accumulate())
-        self.setStatus(f'Drawing time: {frame} ...')
+        # self.setStatus(f'Drawing time: {frame} ...')
 
         self.num = 0
         max = -1
@@ -618,6 +618,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.views.reinit(self.objs)
         self.reselect_cells()
         self.views.update()
+        self.views.setFocus()
 
     def turntable(self):
         if self.views.mode not in ['3D', '3DSPLIT']:
@@ -630,14 +631,14 @@ class MainWindow(QtWidgets.QMainWindow):
     def rotate3DView(self):
         if self.views.mode not in ['3D', '3DSPLIT']:
             return
-        self.views.rotate3DView(self.turntable_speed)
+        self.views.rotate3DView(self.turntable_angle)
         self.update()
 
     def turntableFaster(self):
-        self.turntable_speed *= 1.02
+        self.turntable_angle *= 1.02
 
     def turntableSlower(self):
-        self.turntable_speed /= 1.02
+        self.turntable_angle /= 1.02
 
     def get_factors(self, number):
         factors = self.numbers[number]['factors']

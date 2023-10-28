@@ -31,12 +31,13 @@ class Item:
 
 
 class Scene:
-    def __init__(self, width: int, height: int, y_factor: float=1.) -> None:
+    def __init__(self, width: int, height: int, y_factor: float=1., background: tuple=(0, 0, 0)) -> None:
         self.width: int = width
         self.height: int = height
         self.min_x = 0.
         self.max_x = 0.
         self.y_factor = y_factor
+        self.background = tuple(int(x * 255) for x in background)
         self.ox: float = width / 2
         self.scl: float = 1.
         self.items: list[Item] = []
@@ -50,11 +51,11 @@ class Scene:
         self.items.append(Item(x, height, color, count))
         if x > self.max_x: self.max_x = x
 
-    def scale(self, x: float, step: float):
-        sox = self.ox * self.scl
-        factor = 1.05 if step > 0. else 1./1.05
+    def scale(self, screen_x: float, mouse_step: float):
+        screen_ox = self.ox * self.scl
+        factor = 1.05 if mouse_step > 0. else 1./1.05
         self.scl *= factor
-        self.ox = ((sox - x) * factor + x) / self.scl
+        self.ox = ((screen_ox - screen_x) * factor + screen_x) / self.scl
 
     def fit(self):
         self.min_x =  10000000000
@@ -123,14 +124,15 @@ class Scene:
                 if abs(x_max - x) % ( 5 * x_step) == 0: color = colors[2]
                 if abs(x_max - x) % (10 * x_step) == 0: color = colors[1]
             px = int((x + self.ox) * self.scl)
-            if px < 0 or px > self.width: continue
+            if px < 0 or px > self.width: 
+                continue
             w = 1 if np.abs(px) > 0.1 else 3
             draw.line((px, self.height, px, 0), color, w)
             if abs(x_max - x) % ( 5 * x_step) == 0:
                 draw.text((px+4, 4), f'{x:,d}', fill=color, size=12)
 
     def render(self):
-        img = Image.new('RGB', (self.width, self.height), (0, 0, 0))
+        img = Image.new('RGB', (self.width, self.height), self.background)
         draw = ImageDraw.Draw(img)
 
         if self.select_area:
@@ -232,6 +234,7 @@ class Histogram(QtWidgets.QWidget):
         self.hist_size = (self.resx, self.resy)
         self.hist_max = self.config.get('histogram_max')
         self.hist_y_factor = self.config.get('histogram_y_factor')
+        self.hist_background = tuple(self.config.get('histogram_background'))
         self.color = ColorLine()
         for knot in self.config.get('colors'):
             self.color.add(knot['alpha'], vec3(*knot['color']))
@@ -252,7 +255,7 @@ class Histogram(QtWidgets.QWidget):
         self.setPalette(palette)
         self.setAutoFillBackground(True)
 
-        self.scene = Scene(self.width(), self.height(), self.hist_y_factor)
+        self.scene = Scene(self.width(), self.height(), self.hist_y_factor, self.hist_background)
         self.scene.clear()
         self.label = QtWidgets.QLabel(self)
         self.layout.addWidget(self.label)
