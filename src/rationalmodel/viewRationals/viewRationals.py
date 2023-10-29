@@ -168,6 +168,10 @@ class MainWindow(QtWidgets.QMainWindow):
                 path  = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
             else:
                 path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Not Accumulate', subfolder)
+        if os.path.exists(path) and not single_image:
+            for name in os.listdir(path):
+                os.remove(os.path.join(path, name))
+            os.rmdir(path)
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -195,6 +199,7 @@ class MainWindow(QtWidgets.QMainWindow):
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
         histogram_resy = self.config.get('histogram_resy')
+        frame_rate = 1.0
         if self._check_accumulate():
             frame_rate = self.config.get('frame_rate_accum')
         else:
@@ -215,12 +220,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.action3DTurntable.isChecked()
         ):
             dx = 2.0 / float(end_time - init_time + 1)
+            frame_rate = 12.0
             if self._check_accumulate():
-                frame_rate = 12.5
                 objs = self.make_objects(frame=self.time.value() % 2, make_view=False)
             rotate = True
 
         for time in range(init_time, end_time + 1):
+            factor = 1
+            if (
+                self.views.mode in ['3D', '3DSPLIT'] and 
+                init_time != end_time and 
+                self.action3DTurntable.isChecked()
+            ):
+                factor = 6
             if (
                 self.views.mode in ['3D', '3DSPLIT'] and 
                 init_time != end_time and 
@@ -230,14 +242,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 frame = self.time.value() % 2
             else:
                 frame = time
-                objs = self.make_objects(frame=frame, make_view=False)
-                gc.collect()
+                if frame % factor == 0:
+                    objs = self.make_objects(frame=frame // factor, make_view=False)
+                    gc.collect()
             img = self.views.render(image_resx, image_resy, objs)
             
             file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
-                hist_img = self.histogram.get_save_image(frame)
+                hist_img = self.histogram.get_save_image(frame // factor)
                 img.alpha_composite(hist_img)
                 if self._check_accumulate():
                     hist_name = 'Accum_' + hist_name
@@ -336,7 +349,10 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 self._saveImages(0, 6)
         else:
-            self._saveImages(0, self.maxTime.value())
+            factor = 1
+            if self.views.mode in ['3D', '3DSPLIT'] and self.action3DTurntable.isChecked():
+                factor = 6
+            self._saveImages(0, self.maxTime.value() * factor)
         self.make_objects()
         app.restoreOverrideCursor()
 
