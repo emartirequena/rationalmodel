@@ -242,7 +242,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 frame = self.time.value() % 2
             else:
                 frame = time
-                if frame % factor == 0:
+                if frame % factor == 0 and not self._check_accumulate():
                     objs = self.make_objects(frame=frame // factor, make_view=False)
                     gc.collect()
             img = self.views.render(image_resx, image_resy, objs)
