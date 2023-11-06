@@ -10,7 +10,7 @@ from color import ColorLine
 from utils import lerp
 
 epsilon = 5.
-colors = [(100, 100, 100), (200, 100, 0), (150, 150, 150), (255, 255, 0)]
+colors = [(100, 100, 100), (200, 100, 0), (150, 80, 0), (255, 255, 0)]
 
 
 class Item:

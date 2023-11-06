@@ -224,6 +224,8 @@ class MainWindow(QtWidgets.QMainWindow):
             if self._check_accumulate():
                 objs = self.make_objects(frame=self.time.value() % 2, make_view=False)
             rotate = True
+        else:
+            objs = self.make_objects(frame=self.time.value(), make_view=False)
 
         for time in range(init_time, end_time + 1):
             factor = 1
@@ -337,7 +339,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if subfolder == False: subfolder = ''
         self.deselect_all()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
-        self._saveImages(self.time.value(), self.time.value(), subfolder)
+        frame = self.time.value()
+        self._saveImages(frame, frame, subfolder)
         self.make_objects()
         app.restoreOverrideCursor()
 

@@ -26,5 +26,5 @@
     "histogram_resy": 150,
     "histogram_max": 10000,
     "histogram_y_factor": 0.75,
-    "histogram_background": [0, 0, 0]
+    "histogram_background": [0.0, 0.0, 0.0]
 }
