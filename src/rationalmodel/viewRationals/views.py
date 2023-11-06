@@ -103,14 +103,12 @@ class View(QtWidgets.QWidget):
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
 
-        scene = rendering.Scene(options=None)
+        scene = rendering.Scene(objs, options=None)
         view = RenderView(scene, projection=projection, navigation=navigation)
         if self.type in ['3DVIEW', '3DLEFT', '3DTOP', '3DFRONT']:
             view.resize((resx // 2, resy // 2))
         else:
             view.resize((resx, resy))
-        scene.displays.clear()
-        scene.add(objs)
         return view.render()
     
     def rotate3DView(self, dx):
