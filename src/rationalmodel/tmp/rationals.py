@@ -6,16 +6,16 @@ c = 0.5
 
 class Rational():
     def __init__(self, m: int, n: int, dim=1):
-        self.m = m
-        self.n = n
-        self.dim = dim
-        self.period =self.getPeriod()
+        self.m: np.uint16 = m
+        self.n: np.uint16 = n
+        self.dim: np.uint8 = dim
+        self.period: np.uint8 =self.getPeriod()
 
-        self.digits: list = []
-        self.reminders: list = []
+        self.digits: list[np.uint8] = []
+        self.reminders: list[np.uint16] = []
         self.digits, self.reminders = self.getSequence()
         self.positions = [self.getPosition(t) for t in range(self.period + 1)]
-        # del self.digits
+        del self.digits
         del self.reminders
         atexit.register(self.cleanup)
 
@@ -25,15 +25,15 @@ class Rational():
     def getSequence(self):
         base = int(2**self.dim)
         if self.m == 0:
-            reminders: list = [0]
-            digits: list = [0]
+            reminders: list[np.utin16] = [0]
+            digits: list[np.uint8] = [0]
             return (digits, reminders)
         elif self.m == self.n:
-            reminders: list = [self.m]
-            digits: list = [base - 1]
+            reminders: list[np.utin16] = [self.m]
+            digits: list[np.utin8] = [base - 1]
             return (digits, reminders)
-        digits: list = []
-        reminders: list = []
+        digits: list[np.utin8] = []
+        reminders: list[np.utin16] = []
         reminder: np.uint16 = self.m
         digit: np.uint8 = reminder * base // self.n
         while True:
@@ -106,21 +106,10 @@ class Rational():
     def digit(self, t):
         T = len(self.digits)
         return self.digits[t % T]
-    
-    def time(self, t):
-        T = len(self.digits)
-        time = 0
-        for i in range(t):
-            if self.digits[i % T] != self.digits[(i + 1) % T]:
-                time += 1
-        return time
 
     def __str__(self) -> str:
         return f'({self.m} / {self.n})'
 
 if __name__ == '__main__':
-    dim = 1
-    T = 10
-    n = (2**dim)**int(T) - 1
-    r = Rational(682, n, dim=dim)
-    print(r, r.path(), r.time(10))
+    r = Rational(6, 13, 1)
+    print(r, r.position(4))

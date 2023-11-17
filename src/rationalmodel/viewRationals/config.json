@@ -1,6 +1,7 @@
 {
     "image_path": "C:\\users\\emart\\onedrive\\documentos\\enrique\\rationalmodel\\images",
     "video_path": "C:\\users\\emart\\onedrive\\documentos\\enrique\\rationalmodel\\videos",
+    "files_path": "C:\\users\\emart\\onedrive\\documentos\\enrique\\rationalmodel\\files",
     "ffmpeg_path": "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
     "video_resx": 1920,
     "video_resy": 1080,

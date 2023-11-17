@@ -125,6 +125,20 @@ class MainWindowUI:
         mainWindow.mainMenu.addAction(mainWindow.actionExit)
         mainWindow.menu.addMenu(mainWindow.mainMenu)
 
+        mainWindow.menuFiles = QtWidgets.QMenu('Files')
+
+        mainWindow.actionSave = QtWidgets.QAction('Save Number', mainWindow)
+        mainWindow.actionSave.setShortcut('S')
+        mainWindow.actionSave.triggered.connect(mainWindow.save)
+        mainWindow.menuFiles.addAction(mainWindow.actionSave)
+
+        mainWindow.actionLoad = QtWidgets.QAction('Load Number', mainWindow)
+        mainWindow.actionLoad.setShortcut('L')
+        mainWindow.actionLoad.triggered.connect(mainWindow.load)
+        mainWindow.menuFiles.addAction(mainWindow.actionLoad)
+
+        mainWindow.menu.addMenu(mainWindow.menuFiles)
+
         mainWindow.menuUtils = QtWidgets.QMenu('Utils')
 
         mainWindow.actionSaveImage = QtWidgets.QAction('Save Image', mainWindow)
@@ -136,13 +150,6 @@ class MainWindowUI:
         mainWindow.actionSaveVideo.setShortcut('V')
         mainWindow.actionSaveVideo.triggered.connect(mainWindow.saveVideo)
         mainWindow.menuUtils.addAction(mainWindow.actionSaveVideo)
-
-        mainWindow.menuUtils.addSeparator()
-
-        mainWindow.actionSaveSpecials = QtWidgets.QAction('Save Specials', mainWindow)
-        mainWindow.actionSaveSpecials.setShortcut('S')
-        mainWindow.actionSaveSpecials.triggered.connect(mainWindow.saveSpecials)
-        mainWindow.menuUtils.addAction(mainWindow.actionSaveSpecials)
 
         mainWindow.menuUtils.addSeparator()
 
