@@ -295,7 +295,7 @@ class SpaceTime(object):
 	def load(self, fname):
 		with open(fname, 'rt') as fp:
 			content = json.load(fp)
-			
+
 		self.__init__(content['T'], content['max'], content['dim'])
 		self.n = content['num']
 		self.is_special = content['special']

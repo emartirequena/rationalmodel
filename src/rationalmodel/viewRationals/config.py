@@ -9,6 +9,7 @@ class Config:
         self.values = {
             'image_path': '',
             'video_path': '',
+            'files_path': '',
             'ffmpeg_path': '',
             'image_resx': 1920,
             'image_resy': 1080,

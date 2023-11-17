@@ -10,7 +10,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from PIL import Image, ImageDraw, ImageFont
 
-from madcad import vec3, rendering, settings, uvsphere, Axis, X, Y, Z, Box, cylinder, brick, fvec3, text
+from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, uvsphere, cone
 
 from mainWindowUi import MainWindowUI
 from views import Views
@@ -53,6 +53,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.numbers = {}
         self.config = Config()
         self.color = None
+        self.files_path = self.config.get('files_path')
         self.loadConfigColors()
         self._clear_parameters()
         self.showMaximized()
@@ -582,7 +583,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.viewLayout.addWidget(self.views)
             
         elif not self.first_number_set:
-            print('first number set...')
+            print('setting first number...')
             self.first_number_set = True
             self.views.initialize(self.objs)
             if not self.histogram: self.histogram = Histogram(parent=self)
@@ -776,6 +777,51 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.saveImage(subfolder=subfolder)
                 print(f'------ number {number} saved')
         self.changed_spacetime = True
+
+    def _get_save_file_name(self, path, number, period, factors):
+         return os.path.join(path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.json')
+
+    def save(self):
+        number = int(self.number.value())
+        period = self.period.value()
+        factors = self.get_output_factors(number)
+        file_name = self._get_save_file_name(self.files_path, number, period, factors)
+        out_name, _ = QtWidgets.QFileDialog.getSaveFileName(
+            self, 'Save number json file', file_name, '*.json'
+        )
+        if out_name:
+            self.setStatus(f'Saving file: {os.path.basename(out_name)}...')
+            self.spacetime.save(out_name)
+            self.files_path = os.path.dirname(out_name)
+            self.setStatus(f'File {os.path.basename(out_name)} saved')
+
+    def load(self):
+        in_file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self, 'Open number json file', self.files_path, '*.json'
+        )
+        if in_file_name:
+            self.setStatus(f'Loading file {os.path.basename(in_file_name)}...')
+            if not self.spacetime:
+                self.spacetime = SpaceTime(2, 2, 1)
+            self.spacetime.load(in_file_name)
+            self.dim = self.spacetime.dim
+            spacetime = self.spacetime
+            self._clear_parameters()
+            self.spacetime = spacetime
+            self.period.setValue(self.spacetime.T)
+            self.spacetime = spacetime
+            self.number.setValue(spacetime.n)
+            self.is_special = spacetime.is_special
+            self.maxTime.setValue(spacetime.max)
+            del self.objs
+            self.objs = None
+            gc.collect()
+            self.first_number_set = False
+            self.changed_spacetime = False
+            self.need_compute = False
+            self.time.setValue(spacetime.max)
+            self.views.setFocus()
+            self.setStatus(f'File {os.path.basename(in_file_name)} loaded')
 
 
 if __name__=="__main__":
