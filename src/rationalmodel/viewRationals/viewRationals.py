@@ -591,6 +591,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 if top == base:
                     continue
                 rad = np.linalg.norm(dir) * 0.60
+                if rad < 1.0e-6:
+                    continue
                 obj = cone(top, base, rad)
                 color = vec3(0.8, 0.9, 1.0)
                 obj.option(color=color)
