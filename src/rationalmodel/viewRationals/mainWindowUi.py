@@ -173,7 +173,23 @@ class MainWindowUI:
         mainWindow.actionSwapView.setShortcut('Space')
         mainWindow.actionSwapView.triggered.connect(mainWindow.swap_3d_view)
         mainWindow.menuUtils.addAction(mainWindow.actionSwapView)
-        
+
+        mainWindow.menuUtils.addSeparator()
+
+        mainWindow.actionViewObjects = QtWidgets.QAction('View Objects', mainWindow)
+        mainWindow.actionViewObjects.setShortcut('O')
+        mainWindow.actionViewObjects.setCheckable(True)
+        mainWindow.actionViewObjects.setChecked(True)
+        mainWindow.actionViewObjects.triggered.connect(mainWindow.update_view)
+        mainWindow.menuUtils.addAction(mainWindow.actionViewObjects)
+
+        mainWindow.actionViewNextNumber = QtWidgets.QAction('View Next Number', mainWindow)
+        mainWindow.actionViewNextNumber.setShortcut('N')
+        mainWindow.actionViewNextNumber.setCheckable(True)
+        mainWindow.actionViewNextNumber.setChecked(False)
+        mainWindow.actionViewNextNumber.triggered.connect(mainWindow.update_view)
+        mainWindow.menuUtils.addAction(mainWindow.actionViewNextNumber)
+
         mainWindow.menu.addMenu(mainWindow.menuUtils)
 
         mainWindow.menuTurntable = QtWidgets.QMenu('Turntable')

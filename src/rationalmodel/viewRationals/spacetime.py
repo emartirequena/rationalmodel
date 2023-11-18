@@ -28,6 +28,7 @@ class Cell(object):
 	def clear(self):
 		self.count = 0
 		self.time = 0.0
+		self.next_digits = dict(zip([x for x in range(2**self.dim)], [0 for _ in range(2**self.dim)]))
 
 	def get(self):
 		pos = (self.x, )
@@ -43,9 +44,12 @@ class Cell(object):
 		}
 		return out
 	
-	def set(self, count, time):
+	def set(self, count, time, next_digits):
 		self.count = count
 		self.time = time
+		self.next_digits = dict(zip([x for x in range(2**self.dim)], [0 for _ in range(2**self.dim)]))
+		for x in [x for x in range(2**self.dim)]:
+			self.next_digits[x] = next_digits[str(x)]
 
 
 class Space(object):
@@ -114,7 +118,7 @@ class Space(object):
 	def load(self, input: list[dict]):
 		for in_cell in input:
 			cell = self.getCell(*in_cell['pos'])
-			cell.set(in_cell['count'], in_cell['time'])
+			cell.set(in_cell['count'], in_cell['time'], in_cell['next_digits'])
 
 
 class Spaces:

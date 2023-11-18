@@ -9,12 +9,11 @@ from multiprocessing import freeze_support
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from PIL import Image, ImageDraw, ImageFont
-
+import numpy as np
 from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, uvsphere, cone
 
 from mainWindowUi import MainWindowUI
 from views import Views
-from renderView import RenderView
 from saveSpecials import SaveSpecialsWidget
 from spacetime import SpaceTime
 from rationals import c
@@ -47,6 +46,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.need_compute = True
         self.histogram = None
         self.view_histogram = True
+        self.view_objects = True
+        self.view_next_number = False
         self.spacetime = None
         self.factors = ''
         self.num = 0
@@ -490,6 +491,29 @@ class MainWindow(QtWidgets.QMainWindow):
 
         app.restoreOverrideCursor()
 
+    def _get_next_number_dir(self, cell):
+        if self.dim == 1:
+            v1 = np.array([ 1,  0,  0]) * cell.next_digits[0] / cell.count
+            v2 = np.array([-1,  0,  0]) * cell.next_digits[1] / cell.count
+            v = 0.5 * (v1 + v2) / 2.0
+        elif self.dim == 2:
+            v1 = np.array([ 1,  0,  1]) * cell.next_digits[0] / cell.count
+            v2 = np.array([-1,  0,  1]) * cell.next_digits[1] / cell.count
+            v3 = np.array([ 1,  0, -1]) * cell.next_digits[2] / cell.count
+            v4 = np.array([-1,  0, -1]) * cell.next_digits[3] / cell.count
+            v = 0.5 * np.sqrt(1/2.0) * (v1 + v2 + v3 + v4) / 4.0
+        else:
+            v1 = np.array([ 1,  1,  1]) * cell.next_digits[0] / cell.count
+            v2 = np.array([-1,  1,  1]) * cell.next_digits[1] / cell.count
+            v3 = np.array([ 1,  1, -1]) * cell.next_digits[2] / cell.count
+            v4 = np.array([-1,  1, -1]) * cell.next_digits[3] / cell.count
+            v5 = np.array([ 1, -1,  1]) * cell.next_digits[4] / cell.count
+            v6 = np.array([-1, -1,  1]) * cell.next_digits[5] / cell.count
+            v7 = np.array([ 1, -1, -1]) * cell.next_digits[6] / cell.count
+            v8 = np.array([-1, -1, -1]) * cell.next_digits[7] / cell.count
+            v = 0.5 * np.sqrt(3.0/4.0) * (v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8) / 8.0
+        return v
+
     @timing
     def make_objects(self, frame:int=0, make_view:bool=True):
         if not self.spacetime:
@@ -533,26 +557,44 @@ class MainWindow(QtWidgets.QMainWindow):
         self.objs = {}
         self.config.resetKey()
 
-        for cell in view_cells:
-            alpha = float(cell.count) / float(max)
-            rad = math.pow(alpha / rad_factor, rad_pow)
-            if rad < rad_min:
-                rad = rad_min
-            id = self.config.getKey()
-            color = self.color.getColor(alpha)
-            if cell.count not in self.cell_ids:
-                self.cell_ids[cell.count] = []
-            self.cell_ids[cell.count].append(id)
+        if self.actionViewObjects.isChecked():
+            for cell in view_cells:
+                alpha = float(cell.count) / float(max)
+                rad = math.pow(alpha / rad_factor, rad_pow)
+                if rad < rad_min:
+                    rad = rad_min
+                id = self.config.getKey()
+                color = self.color.getColor(alpha)
+                if cell.count not in self.cell_ids:
+                    self.cell_ids[cell.count] = []
+                self.cell_ids[cell.count].append(id)
 
-            if self.dim == 3:
-                obj = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
-            elif self.dim == 2:
-                obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
-            else:
-                obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
+                if self.actionViewObjects.isChecked():
+                    if self.dim == 3:
+                        obj = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
+                    elif self.dim == 2:
+                        obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
+                    else:
+                        obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
+                    obj.option(color=color)
+                    self.objs[id] = obj
 
-            obj.option(color=color)
-            self.objs[id] = obj
+        if self.actionViewNextNumber.isChecked():
+            for cell in view_cells:
+                id = self.config.getKey()
+                dir = self._get_next_number_dir(cell)
+                if self.dim == 1 or self.dim == 3:
+                    base = vec3(cell.x, cell.y, cell.z)
+                else:
+                    base = vec3(cell.x, 0, cell.y)
+                top = base + dir * 5
+                if top == base:
+                    continue
+                rad = np.linalg.norm(dir) * 0.60
+                obj = cone(top, base, rad)
+                color = vec3(0.8, 0.9, 1.0)
+                obj.option(color=color)
+                self.objs[id] = obj
 
         del view_cells
 
@@ -748,6 +790,9 @@ class MainWindow(QtWidgets.QMainWindow):
     def maxTimeChanged(self):
         self.changed_spacetime = True
         self.need_compute = True
+
+    def update_view(self):
+        self.make_objects()
 
     def saveSpecials(self):
         widget = SaveSpecialsWidget(self, self.period.value(), 61)
