@@ -583,20 +583,29 @@ class MainWindow(QtWidgets.QMainWindow):
             for cell in view_cells:
                 id = self.config.getKey()
                 dir = self._get_next_number_dir(cell)
+                mod_dir = np.linalg.norm(dir)
+                if mod_dir <= 1.0e-6:
+                    continue
+                base = vec3(cell.x, cell.y, cell.z)
+                dir_len = 5.0
                 if self.dim == 1:
-                    base = vec3(cell.x, cell.y - 1.0, cell.z)
+                    base = vec3(cell.x, 0.0, -1.0)
+                    dir_len = 3.0
                 elif self.dim == 2:
                     base = vec3(cell.x, 0, cell.y)
-                else:
-                    base = vec3(cell.x, cell.y, cell.z)
-                top = base + dir * 5
-                if top == base:
-                    continue
-                rad = np.linalg.norm(dir) * 0.60
-                if rad < 1.0e-6:
-                    continue
-                obj = cone(top, base, rad)
-                color = vec3(0.8, 0.9, 1.0)
+
+                top = base + dir * dir_len * 0.6
+                rad = mod_dir * 0.4 * 0.8
+                obj = cylinder(top, base, rad)
+                color = vec3(0.6, 0.8, 1.0)
+                obj.option(color=color)
+                self.objs[id] = obj
+
+                id = self.config.getKey()
+                base = top
+                top = base + dir * dir_len * 0.4
+                rad = mod_dir * 0.4
+                obj = cone(top, base, rad) 
                 obj.option(color=color)
                 self.objs[id] = obj
 
