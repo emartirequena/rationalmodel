@@ -10,7 +10,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
-from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, uvsphere, cone
+from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icosphere, cone
 
 from mainWindowUi import MainWindowUI
 from views import Views
@@ -571,7 +571,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
                 if self.actionViewObjects.isChecked():
                     if self.dim == 3:
-                        obj = uvsphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
+                        obj = icosphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
                     elif self.dim == 2:
                         obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
                     else:
@@ -583,10 +583,12 @@ class MainWindow(QtWidgets.QMainWindow):
             for cell in view_cells:
                 id = self.config.getKey()
                 dir = self._get_next_number_dir(cell)
-                if self.dim == 1 or self.dim == 3:
-                    base = vec3(cell.x, cell.y, cell.z)
-                else:
+                if self.dim == 1:
+                    base = vec3(cell.x, cell.y - 1.0, cell.z)
+                elif self.dim == 2:
                     base = vec3(cell.x, 0, cell.y)
+                else:
+                    base = vec3(cell.x, cell.y, cell.z)
                 top = base + dir * 5
                 if top == base:
                     continue
