@@ -15,8 +15,6 @@ class Rational():
         self.reminders: list = []
         self.digits, self.reminders = self.getSequence()
         self.positions = [self.getPosition(t) for t in range(self.period + 1)]
-        # del self.digits
-        del self.reminders
         atexit.register(self.cleanup)
 
     def cleanup(self):
@@ -25,20 +23,20 @@ class Rational():
     def getSequence(self):
         base = int(2**self.dim)
         if self.m == 0:
-            reminders: list = [0]
-            digits: list = [0]
+            reminders = [0]
+            digits = [0]
             return (digits, reminders)
         elif self.m == self.n:
-            reminders: list = [self.m]
-            digits: list = [base - 1]
+            reminders = [self.m]
+            digits = [base - 1]
             return (digits, reminders)
-        digits: list = []
-        reminders: list = []
-        reminder: np.uint16 = self.m
-        digit: np.uint8 = reminder * base // self.n
+        digits = []
+        reminders = []
+        reminder = self.m
+        digit = reminder * base // self.n
         while True:
             digits.append(digit)
-            # reminders.append(reminder)
+            reminders.append(reminder)
             reminder = (reminder * base) % self.n
             digit = reminder * base // self.n
             if reminder == self.m:
@@ -50,42 +48,44 @@ class Rational():
             return 1
         base = 2**self.dim
         p = 1
-        reminder = 1
+        reminder = self.m
         while True:
             reminder = (reminder * base) % self.n
-            if reminder == 1:
+            if reminder == 0 or reminder == self.m:
                 break
             p = p + 1
         return p
 
     def getPosition(self, t):
         period = len(self.digits)
-        x: np.float16 = 0.0
-        y: np.float16 = 0.0
-        z: np.float16 = 0.0
+        x = 0.0
+        y = 0.0
+        z = 0.0
         for i in range(t):
             digit = self.digits[i % period]
             dx = (digit % 2)
-            dy = (digit // 2) % 2
-            dz = (digit // 4) % 2
             x += c - dx
-            y += c - dy
-            z += c - dz
+            if self.dim > 1:
+                dy = (digit // 2) % 2
+                y += c - dy
+            if self.dim > 2:
+                dz = (digit // 4) % 2
+                z += c - dz
         return (x, y, z)
-
-    def period(self):
-        return self.period
 
     def path(self):
         return ''.join([str(d) for d in self.digits])
 
-    def reminders(self):
+    def reminders_list(self):
         return self.reminders
+    
+    def reminder(self, t):
+        return self.reminders[t % self.period]
 
     def position(self, t):
-        px: np.float16 = 0.0
-        py: np.float16 = 0.0
-        pz: np.float16 = 0.0
+        px = 0.0
+        py = 0.0
+        pz = 0.0
         nt = t // self.period
         for _ in range(nt):
             x, y, z = self.positions[self.period]
@@ -97,18 +97,13 @@ class Rational():
             px += x
             py += y
             pz += z
-        if self.dim == 1:
-            return (px, )
-        elif self.dim == 2:
-            return px, py
         return px, py, pz
 
     def digit(self, t):
-        T = len(self.digits)
-        return self.digits[t % T]
+        return self.digits[t % self.period]
     
     def time(self, t):
-        T = len(self.digits)
+        T = self.period
         time = 0
         for i in range(t):
             if self.digits[i % T] != self.digits[(i + 1) % T]:
@@ -117,10 +112,25 @@ class Rational():
 
     def __str__(self) -> str:
         return f'({self.m} / {self.n})'
+    
+    def __eq__(self, r) -> bool:
+        l = len(self.reminders)
+        for i in range(l):
+            eq = True
+            for j in range(l):
+                if self.reminders[(i + j) % l] != r.reminders[j]:
+                    eq = False
+                    break
+            if eq == True:
+                return True
+        return False
+    
+    def __neq__(self, r) -> bool:
+        return not self.__eq__(r)
 
 if __name__ == '__main__':
     dim = 1
     T = 10
     n = (2**dim)**int(T) - 1
-    r = Rational(682, n, dim=dim)
-    print(r, r.path(), r.time(10))
+    r = Rational(8, 33, dim=dim)
+    print(r, r.reminders_list(), r.path(), r.digit(1), r.position(10), r.period)

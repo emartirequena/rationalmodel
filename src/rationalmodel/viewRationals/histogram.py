@@ -7,7 +7,7 @@ import gc
 
 from config import Config
 from color import ColorLine
-from utils import lerp
+from utils import pil2pixmap
 
 epsilon = 5.
 colors = [(100, 100, 100), (200, 100, 0), (150, 80, 0), (255, 255, 0)]
@@ -156,22 +156,6 @@ class Scene:
                 return item
         return None
 
-    @staticmethod
-    def _pil2pixmap(img):
-        if img.mode == "RGB":
-            r, g, b = img.split()
-            img = Image.merge("RGB", (b, g, r))
-        elif  img.mode == "RGBA":
-            r, g, b, a = img.split()
-            img = Image.merge("RGBA", (b, g, r, a))
-        elif img.mode == "L":
-            img = img.convert("RGBA")
-        img2 = img.convert("RGBA")
-        data = img2.tobytes("raw", "RGBA")
-        qimg = QtGui.QImage(data, img.size[0], img.size[1], QtGui.QImage.Format_ARGB32)
-        pixmap = QtGui.QPixmap.fromImage(qimg)
-        return pixmap
-    
     def init_select_area(self, begin: int):
         self.select_area = SelectArea(begin, self)
 
@@ -283,7 +267,7 @@ class Histogram(QtWidgets.QWidget):
 
     def reset(self):
         img = self.scene.render()
-        self.label.setPixmap(self.scene._pil2pixmap(img))
+        self.label.setPixmap(pil2pixmap(img))
         if self.isVisible():
             self.show()
             self.update()
