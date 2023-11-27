@@ -31,7 +31,6 @@ class HashItem:
 		if m not in self.indexes:
 			self.rationals.append({
 				'm': [m],
-				# 'reminders': reminders, 
 				'digits': digits
 			})
 			i = len(self.rationals) - 1
@@ -107,7 +106,11 @@ class Cell(object):
 		self.next_digits = dict(zip([x for x in range(2**self.dim)], [0 for _ in range(2**self.dim)]))
 		for x in [x for x in range(2**self.dim)]:
 			self.next_digits[x] = next_digits[str(x)]
-		self.rationals = rationals
+		self.rationals = HashRationals(self.n)
+		for rational in rationals:
+			for m in rational['m']:
+				r = Rational(m, self.n, self.dim)
+				self.rationals.add(m, r.reminders, r.digits)
 
 
 class Space(object):
@@ -286,7 +289,7 @@ class SpaceTime(object):
 		self.T = T
 		self.max = max
 		self.dim = dim
-		self.n = 0
+		self.n = n
 		self.is_special = False
 		self.spaces = Spaces(T, n, max, dim)
 		self.rationalSet = []
@@ -330,19 +333,6 @@ class SpaceTime(object):
 		del unordered_set
 		gc.collect()
 
-	# def add_rational(self, r: Rational, t, x, y, z, count_rationals=False):
-	# 	for rt in range(self.max + 1):
-	# 		px, py, pz = r.position(rt)
-	# 		px += x
-	# 		py += y
-	# 		pz += z
-	# 		reminders = r.reminders
-	# 		digits = r.path()
-	# 		m = r.m
-	# 		next_digit = r.digit(t+rt+1)
-	# 		time = r.time(t+rt)
-	# 		self.spaces.add(self.is_special, t+rt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
-
 	@timing
 	def addRationalSet(self, t=0, x=0, y=0, z=0, count_rationals=True):
 		conn1, conn2 = Pipe()
@@ -357,8 +347,6 @@ class SpaceTime(object):
 			obj = conn2.recv()
 			if obj is None:
 				count += 1
-				# if count % 1000 == 0:
-				# 	print(f'{count:06d}', )
 			else:
 				t, reminders, path, m, next_digit, time, px, py, pz = obj
 				self.spaces.add(self.is_special, t, reminders, path, m, next_digit, time, self.T, px, py, pz)
@@ -391,24 +379,23 @@ class SpaceTime(object):
 		with open(fname, 'rt') as fp:
 			content = json.load(fp)
 			
-		self.__init__(content['T'], content['max'], content['dim'])
-		self.n = content['num']
+		self.__init__(content['T'], content['num'], content['max'], content['dim'])
 		self.is_special = content['special']
 		self.spaces.load(content['spaces'])
 
 
 if __name__ == '__main__':
 	dim = 1
-	T = 18
+	T = 10
 	n = (2**dim)**int(T) - 1
 	# n = 33
 	print('Creating spacetime...')
-	spacetime = SpaceTime(T, T, T, dim=dim)
+	spacetime = SpaceTime(T, n, T, dim=dim)
 	print(f'Set rational set for n={n}...')
 	spacetime.setRationalSet(n, is_special=True)
 	print('Add rational set...')
 	spacetime.addRationalSet()
-	# print(f'Save test_1D_N{n}.json...')
-	# spacetime.save(f'test_1D_N{n}.json')
-	# print(f'Load test_1D_N{n}.json...')
-	# spacetime.load(f'test_1D_N{n}.json')
+	print(f'Save test_1D_N{n}.json...')
+	spacetime.save(f'test_1D_N{n}.json')
+	print(f'Load test_1D_N{n}.json...')
+	spacetime.load(f'test_1D_N{n}.json')

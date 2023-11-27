@@ -855,8 +855,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if out_name:
             self.setStatus(f'Saving file: {os.path.basename(out_name)}...')
+            app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.spacetime.save(out_name)
             self.files_path = os.path.dirname(out_name)
+            app.restoreOverrideCursor()
             self.setStatus(f'File {os.path.basename(out_name)} saved')
 
     def load(self):
@@ -865,6 +867,8 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if in_file_name:
             self.setStatus(f'Loading file {os.path.basename(in_file_name)}...')
+            app.setOverrideCursor(QtCore.Qt.WaitCursor)
+            self.files_path = os.path.dirname(in_file_name)
             if not self.spacetime:
                 self.spacetime = SpaceTime(2, 2, 2, 1)
             self.spacetime.load(in_file_name)
@@ -885,6 +889,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.need_compute = False
             self.time.setValue(spacetime.max)
             self.views.setFocus()
+            app.restoreOverrideCursor()
             self.setStatus(f'File {os.path.basename(in_file_name)} loaded')
 
 
