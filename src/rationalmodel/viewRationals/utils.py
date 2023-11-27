@@ -3,18 +3,8 @@ import time
 from functools import reduce
 from copy import copy
 import subprocess
-from PIL import Image, ImageDraw
+from PIL import Image
 from PyQt5 import QtGui
-
-
-def timing(f):
-    def wrap(*args, **kwargs):
-        time1 = time.time()
-        ret = f(*args, **kwargs)
-        time2 = time.time()
-        print(f'------- {f.__name__:s}() took {(time2-time1):.2f} secs')
-        return ret
-    return wrap
 
 
 def lerp(t, ta, a, tb, b):
@@ -25,7 +15,7 @@ def check_ffmpeg(ffmpeg_path: str) -> bool:
     return os.path.exists(ffmpeg_path)
 
 
-def _pil2pixmap(img):
+def pil2pixmap(img):
     if img.mode == "RGB":
         r, g, b = img.split()
         img = Image.merge("RGB", (b, g, r))

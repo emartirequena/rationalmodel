@@ -17,7 +17,8 @@ from views import Views
 from saveSpecials import SaveSpecialsWidget
 from spacetime import SpaceTime
 from rationals import c
-from utils import getDivisorsAndFactors, divisors, make_video, timing
+from utils import getDivisorsAndFactors, divisors, make_video
+from timing import timing
 from config import Config
 from color import ColorLine
 from histogram import Histogram
@@ -459,26 +460,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self.deselect_all()
         # self.views.clear()
 
-        if self.changed_spacetime:
-            if self.spacetime is not None:
-                if self.histogram is not None:
-                    self.histogram.set_spacetime(None)
-                del self.spacetime
-                self.spacetime = None
-                gc.collect(2)
+        n = int(self.number.value())
 
-            self.setStatus('Creating incremental spacetime...')
-            self.spacetime = SpaceTime(self.period.value(), self.maxTime.value(), dim=self.dim)
-        else:
-            self.spacetime.clear()
+        # if self.changed_spacetime:
+        if self.spacetime is not None:
+            if self.histogram is not None:
+                self.histogram.set_spacetime(None)
+            del self.spacetime
+            self.spacetime = None
+            gc.collect(2)
+
+        self.setStatus('Creating incremental spacetime...')
+        self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
+        # else:
+        #     self.spacetime.clear()
         self.changed_spacetime = False
 
-        self.setStatus(f'Setting rational set for number: {int(self.number.value())} ...')
-        self.spacetime.setRationalSet(int(self.number.value()))
+        self.setStatus(f'Setting rational set for number: {n} ...')
+        self.spacetime.setRationalSet(n, self.is_special)
 
         self.setStatus('Adding rational set...')
-        self.spacetime.addRationalSet(self.is_special)
-        self.setStatus(f'Rational set added for number {int(self.number.value())}')
+        self.spacetime.addRationalSet()
+        self.setStatus(f'Rational set added for number {n}')
     
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
@@ -579,7 +582,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     obj.option(color=color)
                     self.objs[id] = obj
 
-        if self.actionViewNextNumber.isChecked():
+        if self.actionViewNextNumber.isChecked(): 
             for cell in view_cells:
                 id = self.config.getKey()
                 dir = self._get_next_number_dir(cell)
@@ -841,6 +844,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def save(self):
         number = int(self.number.value())
+        if number == 0:
+            QtWidgets.QMessageBox.critical(self, 'Error', 'Please, compute a number first')
+            return
         period = self.period.value()
         factors = self.get_output_factors(number)
         file_name = self._get_save_file_name(self.files_path, number, period, factors)
@@ -849,8 +855,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if out_name:
             self.setStatus(f'Saving file: {os.path.basename(out_name)}...')
+            app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.spacetime.save(out_name)
             self.files_path = os.path.dirname(out_name)
+            app.restoreOverrideCursor()
             self.setStatus(f'File {os.path.basename(out_name)} saved')
 
     def load(self):
@@ -859,8 +867,10 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if in_file_name:
             self.setStatus(f'Loading file {os.path.basename(in_file_name)}...')
+            app.setOverrideCursor(QtCore.Qt.WaitCursor)
+            self.files_path = os.path.dirname(in_file_name)
             if not self.spacetime:
-                self.spacetime = SpaceTime(2, 2, 1)
+                self.spacetime = SpaceTime(2, 2, 2, 1)
             self.spacetime.load(in_file_name)
             self.dim = self.spacetime.dim
             spacetime = self.spacetime
@@ -879,6 +889,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.need_compute = False
             self.time.setValue(spacetime.max)
             self.views.setFocus()
+            app.restoreOverrideCursor()
             self.setStatus(f'File {os.path.basename(in_file_name)} loaded')
 
 
