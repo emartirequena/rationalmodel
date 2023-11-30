@@ -24,20 +24,23 @@ class HashItem:
 		self.rationals = []
 		self.indexes = {}
 
-	def add(self, m, reminders, digits):
+	def add(self, m, reminders, digits, time):
 		if not self.min <= m <= self.max:
 			return False
 		
 		if m not in self.indexes:
 			self.rationals.append({
 				'm': [m],
-				'digits': digits
+				'digits': digits,
+				'count': 1,
+				'time': time
 			})
 			i = len(self.rationals) - 1
 			for r in reminders:
 				self.indexes[r] = i
-		else:
+		elif m not in self.rationals[self.indexes[m]]['m']:
 			self.rationals[self.indexes[m]]['m'].append(m)
+			self.rationals[self.indexes[m]]['count'] += 1
 
 		return True
 
@@ -48,9 +51,9 @@ class HashRationals:
 		for i in range(0, num, size):
 			self.hash.append(HashItem(i, i+size-1))
 
-	def add(self, m, reminders, digits):
+	def add(self, m, reminders, digits, time):
 		for item in self.hash:
-			if item.add(m, reminders, digits):
+			if item.add(m, reminders, digits, time):
 				return True
 	
 	def get_rationals(self):
@@ -77,7 +80,7 @@ class Cell(object):
 		self.count += 1
 		self.time += time
 		self.next_digits[next_digit] += 1
-		self.rationals.add(m, reminders, digits)
+		self.rationals.add(m, reminders, digits, time)
 
 	def clear(self):
 		self.count = 0

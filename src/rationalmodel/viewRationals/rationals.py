@@ -103,7 +103,7 @@ class Rational():
         return self.digits[t % self.period]
     
     def time(self, t):
-        T = self.period
+        T = len(self.digits)
         time = 0
         for i in range(t):
             if self.digits[i % T] != self.digits[(i + 1) % T]:

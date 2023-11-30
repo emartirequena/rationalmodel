@@ -2,6 +2,7 @@ import os
 import sys
 import math
 import shutil
+import time
 from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
@@ -15,7 +16,7 @@ from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icospher
 from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
-from spacetime import SpaceTime
+from spacetime import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video
 from timing import timing
@@ -158,9 +159,8 @@ class MainWindow(QtWidgets.QMainWindow):
         dims = ['1D', '2D', '3D']
         return dims[self.dim - 1]
 
-    def _makePath(self, period, number, single_image=False, subfolder=''):
+    def _makePath(self, image_path, period, number, single_image=False, subfolder=''):
         factors = self.get_output_factors(number)
-        image_path = self.config.get('image_path')
         if self._check_accumulate():
             if not single_image:
                 path = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
@@ -183,13 +183,13 @@ class MainWindow(QtWidgets.QMainWindow):
         img = Image.new('RGBA', (500, 40), (0, 0, 0, 0))
         draw = ImageDraw.Draw(img)
         string = f'number: {self.number.value():,.0f} period: {self.period.value():02d}'.replace(',', '.')
-        width = draw.textlength(string) + 10
+        width = int(draw.textlength(string) + 10)
         img.resize((width, 40))
         font = ImageFont.FreeTypeFont('NotoMono-Regular.ttf', size=24)
         draw.text((0, 0), string, font=font, fill=(255, 255, 255, 255))
         return img
 
-    def _saveImages(self, init_time, end_time, subfolder=''):
+    def _saveImages(self, image_path, init_time, end_time, subfolder=''):
         self.setStatus('Saving images...')
         
         number = int(self.number.value())
@@ -197,7 +197,7 @@ class MainWindow(QtWidgets.QMainWindow):
         factors = self.get_output_factors(number)
 
         single_image = True if init_time == end_time else False
-        path = self._makePath(period, number, single_image=single_image, subfolder=subfolder)
+        path = self._makePath(path, period, number, single_image=single_image, subfolder=subfolder)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
@@ -343,22 +343,24 @@ class MainWindow(QtWidgets.QMainWindow):
         self.deselect_all()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         frame = self.time.value()
-        self._saveImages(frame, frame, subfolder)
+        image_path = self.config.get('image_path')
+        self._saveImages(image_path, frame, frame, subfolder)
         self.make_objects()
         app.restoreOverrideCursor()
 
     def saveVideo(self):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
+        image_path = self.config.get('image_path')
         if self._check_accumulate():
             if self.views.mode in ['3D', '3DSPLIT'] and self.action3DTurntable.isChecked():
-                self._saveImages(0, 50)
+                self._saveImages(image_path, 0, 50)
             else:
-                self._saveImages(0, 6)
+                self._saveImages(image_path, 0, 6)
         else:
             factor = 1
             if self.views.mode in ['3D', '3DSPLIT'] and self.action3DTurntable.isChecked():
                 factor = 6
-            self._saveImages(0, self.maxTime.value() * factor)
+            self._saveImages(image_path, 0, self.maxTime.value() * factor)
         self.make_objects()
         app.restoreOverrideCursor()
 
@@ -456,13 +458,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self.need_compute = False
 
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
+        time1 = time.time()
 
         self.deselect_all()
-        # self.views.clear()
 
         n = int(self.number.value())
 
-        # if self.changed_spacetime:
         if self.spacetime is not None:
             if self.histogram is not None:
                 self.histogram.set_spacetime(None)
@@ -472,8 +473,6 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.setStatus('Creating incremental spacetime...')
         self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
-        # else:
-        #     self.spacetime.clear()
         self.changed_spacetime = False
 
         self.setStatus(f'Setting rational set for number: {n} ...')
@@ -486,15 +485,17 @@ class MainWindow(QtWidgets.QMainWindow):
         self.timeWidget.setValue(self.maxTime.value() if self.period_changed else self.time.value())
         self.timeWidget.setFocus()
 
-        # self.first_number_set = False
         if self.time.value() != self.maxTime.value():
             self.time.setValue(self.maxTime.value())
         else:
             self.make_objects()
 
+        time2 = time.time()
+        self.setStatus(f'Rationals set for number {n:,.0f} computed in {time2-time1:,.2f} secs')
+
         app.restoreOverrideCursor()
 
-    def _get_next_number_dir(self, cell):
+    def _get_next_number_dir(self, cell: Cell):
         if self.dim == 1:
             v1 = np.array([ 1,  0,  0]) * cell.next_digits[0] / cell.count
             v2 = np.array([-1,  0,  0]) * cell.next_digits[1] / cell.count
@@ -531,7 +532,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.deselect_all()
         
         view_cells = self.spacetime.getCells(frame, accumulate=self._check_accumulate())
-        # self.setStatus(f'Drawing time: {frame} ...')
 
         self.num = 0
         max = -1
@@ -839,9 +839,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 print(f'------ number {number} saved')
         self.changed_spacetime = True
 
-    def _get_save_file_name(self, path, number, period, factors):
-         return os.path.join(path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.json')
-
     def save(self):
         number = int(self.number.value())
         if number == 0:
@@ -849,7 +846,11 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         period = self.period.value()
         factors = self.get_output_factors(number)
-        file_name = self._get_save_file_name(self.files_path, number, period, factors)
+        files_path = self.config.get('files_path')
+        path  = os.path.join(files_path, self._getDimStr(), f'P{period:02d}')
+        if not os.path.exists(path):
+            os.makedirs(path)
+        file_name = os.path.join(path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.json')
         out_name, _ = QtWidgets.QFileDialog.getSaveFileName(
             self, 'Save number json file', file_name, '*.json'
         )
