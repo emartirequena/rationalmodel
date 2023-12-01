@@ -113,7 +113,7 @@ class Cell(object):
 		for rational in rationals:
 			for m in rational['m']:
 				r = Rational(m, self.n, self.dim)
-				self.rationals.add(m, r.reminders, r.digits)
+				self.rationals.add(m, r.reminders, r.digits, r.time)
 
 
 class Space(object):
