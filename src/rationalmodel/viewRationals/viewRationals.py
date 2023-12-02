@@ -856,17 +856,20 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if out_name:
             self.setStatus(f'Saving file: {os.path.basename(out_name)}...')
+            time1 = time.time()
             app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.spacetime.save(out_name)
             self.files_path = os.path.dirname(out_name)
             app.restoreOverrideCursor()
-            self.setStatus(f'File {os.path.basename(out_name)} saved')
+            time2 = time.time()
+            self.setStatus(f'File {os.path.basename(out_name)} saved in {time2 - time1:0.2f} segs')
 
     def load(self):
         in_file_name, _ = QtWidgets.QFileDialog.getOpenFileName(
             self, 'Open number json file', self.files_path, '*.json'
         )
         if in_file_name:
+            time1 = time.time()
             self.setStatus(f'Loading file {os.path.basename(in_file_name)}...')
             app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.files_path = os.path.dirname(in_file_name)
@@ -891,7 +894,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.time.setValue(spacetime.max)
             self.views.setFocus()
             app.restoreOverrideCursor()
-            self.setStatus(f'File {os.path.basename(in_file_name)} loaded')
+            time2 = time.time()
+            self.setStatus(f'File {os.path.basename(in_file_name)} loaded in {time2 - time1:0.2f} segs')
 
 
 if __name__=="__main__":

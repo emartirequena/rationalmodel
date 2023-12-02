@@ -112,8 +112,7 @@ class Cell(object):
 		self.rationals = HashRationals(self.n)
 		for rational in rationals:
 			for m in rational['m']:
-				r = Rational(m, self.n, self.dim)
-				self.rationals.add(m, r.reminders, r.digits, r.time)
+				self.rationals.add(m, rational['m'], rational['digits'], rational['time'])
 
 
 class Space(object):
@@ -381,7 +380,7 @@ class SpaceTime(object):
 	def load(self, fname):
 		with open(fname, 'rt') as fp:
 			content = json.load(fp)
-			
+
 		self.__init__(content['T'], content['num'], content['max'], content['dim'])
 		self.is_special = content['special']
 		self.spaces.load(content['spaces'])
