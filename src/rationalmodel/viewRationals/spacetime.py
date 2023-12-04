@@ -318,6 +318,19 @@ class SpaceTime(object):
 	def getSpace(self, t, accumulate=False):
 		return self.spaces.getSpace(t, accumulate)
 	
+	def add(self, r: Rational, t, x, y, z):
+		for rt in range(0, self.max + 1):
+			px, py, pz = r.position(rt)
+			px += x
+			py += y
+			pz += z
+			reminders = r.reminders
+			digits = r.path()
+			m = r.m
+			next_digit = r.digit(t+rt+1)
+			time = r.time(t+rt)
+			self.spaces.add(self.is_special, t+rt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
+	
 	@timing
 	def setRationalSet(self, n: int, is_special: bool = False):
 		self.n = n
@@ -337,29 +350,29 @@ class SpaceTime(object):
 
 	@timing
 	def addRationalSet(self, t=0, x=0, y=0, z=0, count_rationals=True):
-		conn1, conn2 = Pipe()
-		p = Pool(cpu_count())
-		params = []
-		for r in self.rationalSet:
-			params.append((conn1, self.max, r, t, x, y, z))
-		p.imap(func=add_rational, iterable=params, chunksize=100000)
-
-		count = 0
-		while True:
-			obj = conn2.recv()
-			if obj is None:
-				count += 1
-			else:
-				t, reminders, path, m, next_digit, time, px, py, pz = obj
-				self.spaces.add(self.is_special, t, reminders, path, m, next_digit, time, self.T, px, py, pz)
-			if count == len(params):
-				break
-
-		p.close()
-		p.join()
-
+		# conn1, conn2 = Pipe()
+		# p = Pool(cpu_count())
+		# params = []
 		# for r in self.rationalSet:
-		# 	self.add_rational(r, t, x, y, z, count_rationals=count_rationals)
+		# 	params.append((conn1, self.max, r, t, x, y, z))
+		# p.imap(func=add_rational, iterable=params, chunksize=100000)
+
+		# count = 0
+		# while True:
+		# 	obj = conn2.recv()
+		# 	if obj is None:
+		# 		count += 1
+		# 	else:
+		# 		t, reminders, path, m, next_digit, time, px, py, pz = obj
+		# 		self.spaces.add(self.is_special, t, reminders, path, m, next_digit, time, self.T, px, py, pz)
+		# 	if count == len(params):
+		# 		break
+
+		# p.close()
+		# p.join()
+
+		for r in self.rationalSet:
+			self.add(r, t, x, y, z)
 
 	@timing
 	def save(self, fname):
