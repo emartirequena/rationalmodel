@@ -1,3 +1,4 @@
+import gc
 import numpy as np
 import moderngl as mgl
 from madcad import rendering, uvec2, fmat4
@@ -19,6 +20,7 @@ class RenderView(rendering.Offscreen):
         self.map_depth = None
         self.map_idents = None
         self.fresh = set()	# set of refreshed internal variables since the last render
+        gc.collect()
 
         if not ctx:
             self.scene.ctx = mgl.create_standalone_context(share=share)
