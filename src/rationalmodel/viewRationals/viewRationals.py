@@ -197,7 +197,7 @@ class MainWindow(QtWidgets.QMainWindow):
         factors = self.get_output_factors(number)
 
         single_image = True if init_time == end_time else False
-        path = self._makePath(path, period, number, single_image=single_image, subfolder=subfolder)
+        path = self._makePath(image_path, period, number, single_image=single_image, subfolder=subfolder)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
@@ -558,7 +558,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.cell_ids = {}
         self.objs = {}
-        self.config.resetKey()
+        # self.config.resetKey()
 
         if self.actionViewObjects.isChecked():
             for cell in view_cells:
