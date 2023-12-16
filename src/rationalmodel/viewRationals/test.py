@@ -30,14 +30,17 @@ def main():
 
         ws.cell(row=1, column=1, value='pos')
         ws.cell(row=1, column=2, value='time')
+        ws.cell(row=1, column=3, value='count')
 
         last = content['spaces'][str(period)]
         row = 2
         for item in last:
             pos = item['pos'][0]
             time = item['time']
+            count = item['count']
             ws.cell(row=row, column=1, value=pos)
             ws.cell(row=row, column=2, value=time)
+            ws.cell(row=row, column=3, value=count)
             row += 1
         
         period += 2
