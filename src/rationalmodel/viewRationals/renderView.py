@@ -43,6 +43,7 @@ class RenderView(rendering.Offscreen):
                             ('ident', self.fb_ident, self.setup_ident)]
         self.map_ident = np.empty((h,w), dtype='u2')
         self.map_depth = np.empty((h,w), dtype='f4')
+        gc.collect()
 
     def resize(self, size):
         if size != self.fb_screen.size:

@@ -42,7 +42,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.views = None
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.rotate3DView)
-        self.turntable_angle = 0.01
+        self.turntable_angle = 0.005
         self.first_number_set = False
         self.changed_spacetime = True
         self.need_compute = True
@@ -296,16 +296,17 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.setStatus('ffmepg not found... (check config.json file specification)')
                     return
 
-                in_sequence_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
-                hist_video_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
-                self.setStatus('Making histogram video...')
-                make_video(
-                    ffmpeg_path, 
-                    in_sequence_name, hist_video_name, 
-                    video_codec, video_format, 
-                    frame_rate, bit_rate, 
-                    histogram_resx, histogram_resy
-                )
+                if self.view_histogram:
+                    in_sequence_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
+                    hist_video_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
+                    self.setStatus('Making histogram video...')
+                    make_video(
+                        ffmpeg_path, 
+                        in_sequence_name, hist_video_name, 
+                        video_codec, video_format, 
+                        frame_rate, bit_rate, 
+                        histogram_resx, histogram_resy
+                    )
 
                 self.setStatus('Copying video...')
                 out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
@@ -497,26 +498,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _get_next_number_dir(self, cell: Cell):
         if self.dim == 1:
-            v1 = np.array([ 1,  0,  0]) * cell.next_digits[0] / cell.count
-            v2 = np.array([-1,  0,  0]) * cell.next_digits[1] / cell.count
-            v = 0.5 * (v1 + v2) / 2.0
+            v1 = np.array([ 1,  0,  0]) * cell.next_digits[0]
+            v2 = np.array([-1,  0,  0]) * cell.next_digits[1]
+            f = 0.5
+            v = (v1 + v2) / 2.0
         elif self.dim == 2:
-            v1 = np.array([ 1,  0,  1]) * cell.next_digits[0] / cell.count
-            v2 = np.array([-1,  0,  1]) * cell.next_digits[1] / cell.count
-            v3 = np.array([ 1,  0, -1]) * cell.next_digits[2] / cell.count
-            v4 = np.array([-1,  0, -1]) * cell.next_digits[3] / cell.count
-            v = 0.5 * np.sqrt(1/2.0) * (v1 + v2 + v3 + v4) / 4.0
+            v1 = np.array([ 1,  0,  1]) * cell.next_digits[0]
+            v2 = np.array([-1,  0,  1]) * cell.next_digits[1]
+            v3 = np.array([ 1,  0, -1]) * cell.next_digits[2]
+            v4 = np.array([-1,  0, -1]) * cell.next_digits[3]
+            f = 0.5
+            v = (v1 + v2 + v3 + v4) / 4.0
         else:
-            v1 = np.array([ 1,  1,  1]) * cell.next_digits[0] / cell.count
-            v2 = np.array([-1,  1,  1]) * cell.next_digits[1] / cell.count
-            v3 = np.array([ 1,  1, -1]) * cell.next_digits[2] / cell.count
-            v4 = np.array([-1,  1, -1]) * cell.next_digits[3] / cell.count
-            v5 = np.array([ 1, -1,  1]) * cell.next_digits[4] / cell.count
-            v6 = np.array([-1, -1,  1]) * cell.next_digits[5] / cell.count
-            v7 = np.array([ 1, -1, -1]) * cell.next_digits[6] / cell.count
-            v8 = np.array([-1, -1, -1]) * cell.next_digits[7] / cell.count
-            v = 0.5 * np.sqrt(3.0/4.0) * (v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8) / 8.0
-        return v
+            v1 = np.array([ 1,  1,  1]) * cell.next_digits[0]
+            v2 = np.array([-1,  1,  1]) * cell.next_digits[1]
+            v3 = np.array([ 1,  1, -1]) * cell.next_digits[2]
+            v4 = np.array([-1,  1, -1]) * cell.next_digits[3]
+            v5 = np.array([ 1, -1,  1]) * cell.next_digits[4]
+            v6 = np.array([-1, -1,  1]) * cell.next_digits[5]
+            v7 = np.array([ 1, -1, -1]) * cell.next_digits[6]
+            v8 = np.array([-1, -1, -1]) * cell.next_digits[7]
+            f = 0.5
+            v = (v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8) / 8.0
+        nv = np.linalg.norm(v)
+        nv = nv if nv > 20 else 20
+        k = np.power(nv / cell.count / self.max / 0.5, 0.7)
+        vnorm = k * f * v
+        return vnorm
 
     @timing
     def make_objects(self, frame:int=0, make_view:bool=True):
@@ -534,12 +542,12 @@ class MainWindow(QtWidgets.QMainWindow):
         view_cells = self.spacetime.getCells(frame, accumulate=self._check_accumulate())
 
         self.num = 0
-        max = -1
+        self.max = -1
         self.count = 0
         for cell in view_cells:
             num = cell.count
-            if num > max:
-                max = num
+            if num > self.max:
+                self.max = num
             if num > 0:
                 self.count += 1
             self.num += num
@@ -562,7 +570,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if self.actionViewObjects.isChecked():
             for cell in view_cells:
-                alpha = float(cell.count) / float(max)
+                alpha = float(cell.count) / float(self.max)
                 rad = math.pow(alpha / rad_factor, rad_pow)
                 if rad < rad_min:
                     rad = rad_min
