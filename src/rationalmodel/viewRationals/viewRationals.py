@@ -500,14 +500,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.dim == 1:
             v1 = np.array([ 1,  0,  0]) * cell.next_digits[0]
             v2 = np.array([-1,  0,  0]) * cell.next_digits[1]
-            f = 0.5
             v = (v1 + v2) / 2.0
         elif self.dim == 2:
             v1 = np.array([ 1,  0,  1]) * cell.next_digits[0]
             v2 = np.array([-1,  0,  1]) * cell.next_digits[1]
             v3 = np.array([ 1,  0, -1]) * cell.next_digits[2]
             v4 = np.array([-1,  0, -1]) * cell.next_digits[3]
-            f = 0.5
             v = (v1 + v2 + v3 + v4) / 4.0
         else:
             v1 = np.array([ 1,  1,  1]) * cell.next_digits[0]
@@ -518,13 +516,8 @@ class MainWindow(QtWidgets.QMainWindow):
             v6 = np.array([-1, -1,  1]) * cell.next_digits[5]
             v7 = np.array([ 1, -1, -1]) * cell.next_digits[6]
             v8 = np.array([-1, -1, -1]) * cell.next_digits[7]
-            f = 0.5
             v = (v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8) / 8.0
-        nv = np.linalg.norm(v)
-        nv = nv if nv > 20 else 20
-        k = np.power(nv / cell.count / self.max / 0.5, 0.7)
-        vnorm = k * f * v
-        return vnorm
+        return v
 
     @timing
     def make_objects(self, frame:int=0, make_view:bool=True):
@@ -591,34 +584,48 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.objs[id] = obj
 
         if self.actionViewNextNumber.isChecked(): 
+            min_dir = 1000000
+            max_dir = -1000000
             for cell in view_cells:
-                id = self.config.getKey()
                 dir = self._get_next_number_dir(cell)
-                mod_dir = np.linalg.norm(dir)
-                if mod_dir <= 1.0e-6:
-                    continue
-                base = vec3(cell.x, cell.y, cell.z)
-                dir_len = 5.0
-                if self.dim == 1:
-                    base = vec3(cell.x, 0.0, -1.0)
-                    dir_len = 3.0
-                elif self.dim == 2:
-                    base = vec3(cell.x, 0, cell.y)
+                ndir = np.linalg.norm(dir)
+                if ndir < min_dir: min_dir = ndir
+                if ndir > max_dir: max_dir = ndir
 
-                top = base + dir * dir_len * 0.6
-                rad = mod_dir * 0.4 * 0.8
-                obj = cylinder(top, base, rad)
-                color = vec3(0.6, 0.8, 1.0)
-                obj.option(color=color)
-                self.objs[id] = obj
+            if min_dir <= max_dir:
+                for cell in view_cells:
+                    dir = self._get_next_number_dir(cell)
+                    mod_dir = np.linalg.norm(dir)
+                    k = np.power((mod_dir*1.5 - min_dir) / (max_dir*15 - min_dir), 0.75)
+                    if k <= 1.0e-6:
+                        continue
+                    dir = dir * k / mod_dir
+                    mod_dir = k
 
-                id = self.config.getKey()
-                base = top
-                top = base + dir * dir_len * 0.4
-                rad = mod_dir * 0.4
-                obj = cone(top, base, rad) 
-                obj.option(color=color)
-                self.objs[id] = obj
+                    base = vec3(cell.x, cell.y, cell.z)
+                    dir_len = 5.0
+                    if self.dim == 1:
+                        base = vec3(cell.x, 0.0, -1.0)
+                        dir_len = 3.0
+                    elif self.dim == 2:
+                        base = vec3(cell.x, 0, cell.y)
+
+                    color = vec3(0.6, 0.8, 1.0)
+
+                    top = base + dir * dir_len * 0.6
+                    rad = mod_dir * 0.4 * 0.8
+                    obj = cylinder(top, base, rad)
+                    obj.option(color=color)
+                    id = self.config.getKey()
+                    self.objs[id] = obj
+
+                    base = top
+                    top = base + dir * dir_len * 0.4
+                    rad = mod_dir * 0.4
+                    obj = cone(top, base, rad) 
+                    obj.option(color=color)
+                    id = self.config.getKey()
+                    self.objs[id] = obj
 
         del view_cells
 
