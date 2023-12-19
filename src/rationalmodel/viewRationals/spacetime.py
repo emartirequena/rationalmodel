@@ -1,6 +1,7 @@
 from multiprocessing import Pool, cpu_count, Pipe
 import json
 import gc
+import time
 
 from rationals import Rational, c
 from timing import timing
@@ -115,6 +116,11 @@ class Cell(object):
 				self.rationals.add(m, rational['m'], rational['digits'], rational['time'])
 
 
+def filterCells(list_cells: list[Cell]) -> list[Cell]:
+	cells = list(filter(lambda x: x.count > 0, list_cells))
+	return cells
+
+
 class Space(object):
 	def __init__(self, t, dim, T, n, name='normal'):
 		self.t = t
@@ -155,8 +161,35 @@ class Space(object):
 			return None
 		return self.cells[n]
 	
+	def countCells(self):
+		l = 0
+		for cell in self.cells:
+			if cell.count:
+				l += 1
+		return l
+
 	def getCells(self):
-		return list(filter(lambda x: x.count > 0, self.cells))
+		size = 150
+		l = self.countCells()
+		if l <= size:
+			return list(filter(lambda x: x.count > 0, self.cells))
+		
+		p = Pool(cpu_count())
+		params = []
+		for m in range(int(l/size)):
+			params.append(self.cells[m:m+size])
+		params.append(self.cells[m:])
+		filtered_lists = p.imap(func=filterCells, iterable=params, chunksize=size)
+		p.close()
+		p.join()
+
+		filtered_cells = []
+		for list_cells in filtered_lists:
+			filtered_cells += list_cells
+
+		del filtered_lists
+
+		return filtered_cells
 
 	def add(self, time, reminders, digits, m, next_digit, x, y, z):
 		cell = self.getCell(x, y, z)

@@ -249,7 +249,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 frame = time
                 if frame % factor == 0 and not self._check_accumulate():
                     objs = self.make_objects(frame=frame // factor, make_view=False)
-                    gc.collect()
+                    # gc.collect()
             img = self.views.render(image_resx, image_resy, objs)
             
             file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
@@ -275,7 +275,7 @@ class MainWindow(QtWidgets.QMainWindow):
             
         self.histogram.end_save_image()
 
-        gc.collect()
+        # gc.collect()
         self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
@@ -379,7 +379,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self._switch_display(count, False)
             del self.selected[count]
 
-    @timing
     def select_all(self, nope=False):
         for count in self.cell_ids:
             if count not in self.selected:
@@ -387,14 +386,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._switch_display(count, True)
         self.refresh_selection()
 
-    @timing
     def deselect_all(self, nope=False):
         if not self.selected:
             return
         for count in self.selected:
             self._switch_display(count, False)
         self.selected = {}
-        gc.collect()       
+        # gc.collect()       
         self.refresh_selection()
 
     def reselect_cells(self):
@@ -491,6 +489,8 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.make_objects()
 
+        gc.collect()
+        
         time2 = time.time()
         self.setStatus(f'Rationals set for number {n:,.0f} computed in {time2-time1:,.2f} secs')
 
@@ -573,15 +573,14 @@ class MainWindow(QtWidgets.QMainWindow):
                     self.cell_ids[cell.count] = []
                 self.cell_ids[cell.count].append(id)
 
-                if self.actionViewObjects.isChecked():
-                    if self.dim == 3:
-                        obj = icosphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
-                    elif self.dim == 2:
-                        obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
-                    else:
-                        obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
-                    obj.option(color=color)
-                    self.objs[id] = obj
+                if self.dim == 3:
+                    obj = icosphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
+                elif self.dim == 2:
+                    obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
+                else:
+                    obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
+                obj.option(color=color)
+                self.objs[id] = obj
 
         if self.actionViewNextNumber.isChecked(): 
             min_dir = 1000000
@@ -592,7 +591,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 if ndir < min_dir: min_dir = ndir
                 if ndir > max_dir: max_dir = ndir
 
-            if min_dir <= max_dir:
+            if min_dir < max_dir:
                 for cell in view_cells:
                     dir = self._get_next_number_dir(cell)
                     mod_dir = np.linalg.norm(dir)
@@ -649,6 +648,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             return self.objs
 
+    @timing
     def make_view(self, frame):
         if not self.views:
             print("view doesn't exists...")
@@ -662,20 +662,19 @@ class MainWindow(QtWidgets.QMainWindow):
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(frame, self._check_accumulate())
             if self.view_histogram:
+                self.histogram.set_time(frame, self._check_accumulate())
                 self.histogram.show()
-
         else:
             print('continue setting number...')
             self.views.reset(self.objs)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
-            self.histogram.set_time(frame, self._check_accumulate())
             if self.view_histogram:
+                self.histogram.set_time(frame, self._check_accumulate())
                 self.histogram.show()
         
-        gc.collect()
+        # gc.collect()
         self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
 
     def fit_histogram(self):
@@ -902,7 +901,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.maxTime.setValue(spacetime.max)
             del self.objs
             self.objs = None
-            gc.collect()
+            # gc.collect()
             self.first_number_set = False
             self.changed_spacetime = False
             self.need_compute = False

@@ -4,10 +4,12 @@ from PIL import Image, ImageDraw
 from madcad import vec3
 import numpy as np
 import gc
+import time
 
 from config import Config
 from color import ColorLine
 from utils import pil2pixmap
+from timing import timing
 
 epsilon = 5.
 colors = [(100, 100, 100), (200, 100, 0), (150, 80, 0), (255, 255, 0)]
@@ -284,12 +286,10 @@ class Histogram(QtWidgets.QWidget):
             self.change_flag = False
         self.reset()
 
+    @timing
     def _make_items(self):
-        space = self.spacetime.getSpace(self.time, self.accumulate)
-
         dict_objs = {}
-
-        view_cells = list(filter(lambda cell: cell.count != 0, space.cells))
+        view_cells = self.spacetime.getCells(self.time, self.accumulate)
 
         max = -1
         for cell in view_cells:
@@ -312,7 +312,7 @@ class Histogram(QtWidgets.QWidget):
 
         del view_cells
         del dict_objs
-        gc.collect()
+        # gc.collect()
 
     def prepare_save_image(self):
         self.old_time = self.time
