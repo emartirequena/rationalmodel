@@ -7,6 +7,7 @@ from PIL import Image, ImageDraw
 
 from screenView import ScreenView
 from renderView import RenderView
+from timing import timing
 
 
 class View(QtWidgets.QWidget):
@@ -229,6 +230,7 @@ class Views(QtWidgets.QWidget):
             if view.active:
                 view.reinit(objs)
 
+    @timing
     def reset(self, objs):
         view: View
         for view in self.views.values():
