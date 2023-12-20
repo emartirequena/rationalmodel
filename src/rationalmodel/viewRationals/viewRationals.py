@@ -517,7 +517,7 @@ class MainWindow(QtWidgets.QMainWindow):
             v7 = np.array([ 1, -1, -1]) * cell.next_digits[6]
             v8 = np.array([-1, -1, -1]) * cell.next_digits[7]
             v = (v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8) / 8.0
-        return v
+        return v * cell.count
 
     @timing
     def make_objects(self, frame:int=0, make_view:bool=True):
@@ -545,7 +545,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.count += 1
             self.num += num
         
-        self.setStatus(f'Creating {self.count} objects at time: {frame}')
+        self.setStatus(f'Creating {self.count} cells at time: {frame}')
 
         if not self._check_accumulate():
             rad_factor = self.config.get('rad_factor')
@@ -675,7 +675,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.histogram.show()
         
         # gc.collect()
-        self.setStatus(f'{self.count} objects created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
+        self.setStatus(f'{self.count} cells created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
 
     def fit_histogram(self):
         if not self.histogram or not self.view_histogram:
