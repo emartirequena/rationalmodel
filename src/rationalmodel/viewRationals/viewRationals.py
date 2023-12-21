@@ -591,40 +591,44 @@ class MainWindow(QtWidgets.QMainWindow):
                 if ndir < min_dir: min_dir = ndir
                 if ndir > max_dir: max_dir = ndir
 
-            if min_dir < max_dir:
-                for cell in view_cells:
-                    dir = self._get_next_number_dir(cell)
-                    mod_dir = np.linalg.norm(dir)
+            for cell in view_cells:
+                dir = self._get_next_number_dir(cell)
+                mod_dir = np.linalg.norm(dir)
+                if min_dir < max_dir:
                     k = np.power((mod_dir*1.5 - min_dir) / (max_dir*15 - min_dir), 0.75)
                     if k <= 1.0e-6:
-                        continue
-                    dir = dir * k / mod_dir
-                    mod_dir = k
+                        k = 0.2
+                else:
+                    k = 0.2
+                if mod_dir < 1.0e-6:
+                    continue
+                dir = dir * k / mod_dir
+                mod_dir = k
 
-                    base = vec3(cell.x, cell.y, cell.z)
-                    dir_len = 5.0
-                    if self.dim == 1:
-                        base = vec3(cell.x, 0.0, -1.0)
-                        dir_len = 3.0
-                    elif self.dim == 2:
-                        base = vec3(cell.x, 0, cell.y)
+                base = vec3(cell.x, cell.y, cell.z)
+                dir_len = 5.0
+                if self.dim == 1:
+                    base = vec3(cell.x, 0.0, -1.0)
+                    dir_len = 3.0
+                elif self.dim == 2:
+                    base = vec3(cell.x, 0, cell.y)
 
-                    color = vec3(0.6, 0.8, 1.0)
+                color = vec3(0.6, 0.8, 1.0)
 
-                    top = base + dir * dir_len * 0.6
-                    rad = mod_dir * 0.4 * 0.8
-                    obj = cylinder(top, base, rad)
-                    obj.option(color=color)
-                    id = self.config.getKey()
-                    self.objs[id] = obj
+                top = base + dir * dir_len * 0.6
+                rad = mod_dir * 0.4 * 0.8
+                obj = cylinder(top, base, rad)
+                obj.option(color=color)
+                id = self.config.getKey()
+                self.objs[id] = obj
 
-                    base = top
-                    top = base + dir * dir_len * 0.4
-                    rad = mod_dir * 0.4
-                    obj = cone(top, base, rad) 
-                    obj.option(color=color)
-                    id = self.config.getKey()
-                    self.objs[id] = obj
+                base = top
+                top = base + dir * dir_len * 0.4
+                rad = mod_dir * 0.4
+                obj = cone(top, base, rad) 
+                obj.option(color=color)
+                id = self.config.getKey()
+                self.objs[id] = obj
 
         del view_cells
 
