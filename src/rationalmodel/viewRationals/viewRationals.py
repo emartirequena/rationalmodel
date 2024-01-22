@@ -468,7 +468,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.histogram.set_spacetime(None)
             del self.spacetime
             self.spacetime = None
-            gc.collect(2)
+        
+        gc.collect()
 
         self.setStatus('Creating incremental spacetime...')
         self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
@@ -781,7 +782,16 @@ class MainWindow(QtWidgets.QMainWindow):
         self.maxTime.setSingleStep(T)
         self.setStatus('Divisors computed. Select now a number from the list and press the Compute button')
 
+    def _to_qt_list_color(self, color_name):
+        return QtGui.QColor(*[int(255 * x) for x in self.config.get(color_name)])
+
     def fillDivisors(self, T: int):
+
+        not_period = self._to_qt_list_color('list_color_not_period')
+        not_period_prime = self._to_qt_list_color('list_color_not_period_prime')
+        period_special = self._to_qt_list_color('list_color_period_special')
+        period_not_special = self._to_qt_list_color('list_color_period_not_special')
+
         a = int(2 ** self.dim)
         b = int(T)
         c = int(2)
@@ -803,15 +813,15 @@ class MainWindow(QtWidgets.QMainWindow):
             is_special: bool = False
             if period != T:
                 if is_prime:
-                    item.setForeground(QtGui.QBrush(Qt.red))
+                    item.setForeground(not_period_prime)
                 else:
-                    item.setForeground(QtGui.QBrush(Qt.darkRed))
+                    item.setForeground(not_period)
             else:
                 if x in specials:
-                    item.setForeground(QtGui.QBrush(Qt.darkGreen))
+                    item.setForeground(period_special)
                     is_special = True
                 elif is_prime:
-                    item.setForeground(QtGui.QBrush(Qt.blue))
+                    item.setForeground(period_not_special)
             item.setData(Qt.UserRole, is_special)
             self.divisors.addItem(item)
                 

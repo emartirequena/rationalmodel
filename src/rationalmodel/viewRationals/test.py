@@ -8,6 +8,7 @@ def main():
     config = Config()
     path = config.get('files_path')
     file_paths = [
+        os.path.join(path, '1D', 'P06', '1D_N63_P06_F3^2_7.json'),
         os.path.join(path, '1D', 'P08', '1D_N255_P08_F3_5_17.json'),
         os.path.join(path, '1D', 'P10', '1D_N1023_P10_F3_11_31.json'),
         os.path.join(path, '1D', 'P12', '1D_N4095_P12_F3^2_5_7_13.json'),
@@ -16,7 +17,7 @@ def main():
         os.path.join(path, '1D', 'P18', '1D_N262143_P18_F3^3_7_19_73.json')
     ]
 
-    period = 8
+    period = 6
 
     wb = Workbook()
     wb.remove(wb.active)
