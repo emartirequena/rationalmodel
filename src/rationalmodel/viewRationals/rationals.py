@@ -80,7 +80,8 @@ class Rational():
         return self.reminders
     
     def reminder(self, t):
-        return self.reminders[t % self.period]
+        T = len(self.digits)
+        return self.reminders[t % T]
 
     def position(self, t):
         px = 0.0

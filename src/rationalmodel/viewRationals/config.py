@@ -35,7 +35,11 @@ class Config:
             'histogram_max': 10000,
             'histogram_y_factor': 0.5,
             'histogram_background': [0.0, 0.0, 0.0],
-            'objects_key': 1
+            'objects_key': 1,
+            'list_color_not_period': [0.5, 0.0, 0.0],
+            'list_color_not_period_prime': [1.0, 0.0, 1.0],
+            'list_color_period_special': [0.0, 1.0, 1.0],
+            'list_color_period_not_special': [0.0, 0.0, 1.0]
         }
         if os.path.exists(config_file):
             with open(config_file, 'rt') as fp:

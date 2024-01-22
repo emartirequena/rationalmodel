@@ -359,7 +359,7 @@ class SpaceTime(object):
 			pz += z
 			reminders = r.reminders
 			digits = r.path()
-			m = r.m
+			m = r.reminder(t+rt)
 			next_digit = r.digit(t+rt+1)
 			time = r.time(t+rt)
 			self.spaces.add(self.is_special, t+rt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
@@ -433,8 +433,8 @@ class SpaceTime(object):
 
 
 if __name__ == '__main__':
-	dim = 1
-	T = 10
+	dim = 2
+	T = 8
 	n = (2**dim)**int(T) - 1
 	# n = 33
 	print('Creating spacetime...')
