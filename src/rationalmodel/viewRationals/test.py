@@ -3,6 +3,8 @@ import os
 from config import Config
 from openpyxl import Workbook
 
+from utils import getPeriod
+
 
 def main():
     config = Config()
@@ -48,5 +50,33 @@ def main():
 
     wb.save(os.path.join(path, '1D', 'times_new.xlsx'))
 
+def main2():
+    upper = 10000
+    divupper = upper / 2.0
+
+    print('   n  p1d  p2d  p3d')
+    print('---- ---- ---- ----')
+    num_p1d = 0
+    num_p2d = 0
+    num_p3d = 0
+    for n in range(1, upper+1, 2):
+        p1d = getPeriod(n, 2)
+        p2d = getPeriod(n, 4)
+        p3d = getPeriod(n, 8)
+        # print(f'{n:4d} {p1d:4d} {p2d:4d} {p3d:4d}')
+
+        if p1d % 2 == 1:
+            num_p1d += 1
+        if p2d % 2 == 1:
+            num_p2d += 1
+        if p3d % 2 == 1:
+            num_p3d += 1
+        
+    print('')
+    print(f'Odd period 1d: {100.0 * num_p1d / divupper:5.2f}%')
+    print(f'Odd period 2d: {100.0 * num_p2d / divupper:5.2f}%')
+    print(f'Odd period 3d: {100.0 * num_p3d / divupper:5.2f}%')
+
+
 if __name__ == '__main__':
-    main()
+    main2()

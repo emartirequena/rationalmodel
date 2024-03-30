@@ -25,6 +25,10 @@ class HashItem:
 		self.rationals = []
 		self.indexes = {}
 
+	def __del__(self):
+		del self.rationals
+		del self.indexes
+
 	def add(self, m, reminders, digits, time):
 		if not self.min <= m <= self.max:
 			return False
@@ -52,6 +56,9 @@ class HashRationals:
 		for i in range(0, num, size):
 			self.hash.append(HashItem(i, i+size-1))
 
+	def __del__(self):
+		del self.hash
+
 	def add(self, m, reminders, digits, time):
 		for item in self.hash:
 			if item.add(m, reminders, digits, time):
@@ -76,6 +83,10 @@ class Cell(object):
 		self.time = 0.0
 		self.next_digits = dict(zip([x for x in range(2**self.dim)], [0 for _ in range(2**self.dim)]))
 		self.rationals = HashRationals(self.n)
+
+	def __del__(self):
+		del self.next_digits
+		del self.rationals
 
 	def add(self, time: int, reminders: list[int], digits: str, m: int, next_digit: int):
 		self.count += 1
@@ -169,14 +180,14 @@ class Space(object):
 		return l
 
 	def getCells(self):
-		size = 150
+		size = 100
 		l = self.countCells()
 		if l <= size:
 			return list(filter(lambda x: x.count > 0, self.cells))
 		
 		p = Pool(cpu_count())
 		params = []
-		for m in range(int(l/size)):
+		for m in range(l // size):
 			params.append(self.cells[m:m+size])
 		params.append(self.cells[m:])
 		filtered_lists = p.imap(func=filterCells, iterable=params, chunksize=size)
@@ -187,6 +198,7 @@ class Space(object):
 		for list_cells in filtered_lists:
 			filtered_cells += list_cells
 
+		del params
 		del filtered_lists
 
 		return filtered_cells
@@ -226,6 +238,8 @@ class Spaces:
 
 	def __del__(self):
 		del self.spaces
+		del self.accumulates_even
+		del self.accumulates_odd
 
 	def add(self, is_special, t, reminders, digits, m, next_digit, time, cycle, x, y, z):
 		self.spaces[t].add(time, reminders, digits, m, next_digit, x, y, z)
