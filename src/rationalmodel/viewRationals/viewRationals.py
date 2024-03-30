@@ -6,6 +6,7 @@ import time
 from copy import deepcopy
 import gc
 from multiprocessing import freeze_support
+import math
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
@@ -16,6 +17,7 @@ from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icospher
 from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
+from turntableVideo import TurntableVideoWidget
 from spacetime import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video
@@ -153,6 +155,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print(f'status: {txt}')
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
+        gc.collect()
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def _getDimStr(self):
@@ -180,111 +183,113 @@ class MainWindow(QtWidgets.QMainWindow):
         return path
 
     def _get_number_img(self):
-        img = Image.new('RGBA', (500, 40), (0, 0, 0, 0))
+        img = Image.new('RGBA', (500, 40), (255, 255, 255, 255))
         draw = ImageDraw.Draw(img)
         string = f'number: {self.number.value():,.0f} period: {self.period.value():02d}'.replace(',', '.')
         width = int(draw.textlength(string) + 10)
         img.resize((width, 40))
         font = ImageFont.FreeTypeFont('NotoMono-Regular.ttf', size=24)
-        draw.text((0, 0), string, font=font, fill=(255, 255, 255, 255))
+        draw.text((0, 0), string, font=font, fill=(0, 0, 0, 0))
         return img
 
-    def _saveImages(self, image_path, init_time, end_time, subfolder=''):
+    def _saveImages(self, image_path, init_time, end_time, subfolder='', num_frames=0, turn_angle=0):
         self.setStatus('Saving images...')
-        
+
         number = int(self.number.value())
         period = self.period.value()
         factors = self.get_output_factors(number)
 
-        single_image = True if init_time == end_time else False
+        single_image = True if num_frames == 0 else False
         path = self._makePath(image_path, period, number, single_image=single_image, subfolder=subfolder)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
         histogram_resy = self.config.get('histogram_resy')
-        frame_rate = 1.0
-        if self._check_accumulate():
+        if self._check_accumulate() and turn_angle == 0:
             frame_rate = self.config.get('frame_rate_accum')
         else:
             frame_rate = self.config.get('frame_rate')
+            if turn_angle > 0 and init_time == end_time:
+                frame_rate = 25.0
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
         video_format = self.config.get('video_format')
         video_codec = self.config.get('video_codec')
         bit_rate = self.config.get('bit_rate')
+        self.setStatus(f'res: {image_resx}x{image_resy} at {frame_rate:0.1f} fps...')
 
-        self.histogram.prepare_save_image()
+        if num_frames == 0:
+            num_frames = end_time - init_time + 1
+
+        if self.view_histogram:
+            self.histogram.prepare_save_image()
 
         rotate = False
         dx = 0.0
-        if (
-            self.views.mode in ['3D', '3DSPLIT'] and 
-            init_time != end_time and 
-            self.action3DTurntable.isChecked()
-        ):
-            dx = 2.0 / float(end_time - init_time + 1)
-            frame_rate = 12.0
-            if self._check_accumulate():
-                objs = self.make_objects(frame=self.time.value() % 2, make_view=False)
+        if (turn_angle > 0):
+            k = 0.005 * 400 / 360
+            dx = k * turn_angle / num_frames
             rotate = True
-        else:
-            objs = self.make_objects(frame=self.time.value(), make_view=False)
+        objs = self.make_objects(frame=init_time, make_view=False)
 
-        for time in range(init_time, end_time + 1):
-            factor = 1
-            if (
-                self.views.mode in ['3D', '3DSPLIT'] and 
-                init_time != end_time and 
-                self.action3DTurntable.isChecked()
-            ):
-                factor = 6
-            if (
-                self.views.mode in ['3D', '3DSPLIT'] and 
-                init_time != end_time and 
-                self.action3DTurntable.isChecked() and 
-                self._check_accumulate()
-            ):
-                frame = self.time.value() % 2
+        factor = 1
+        if self._check_accumulate() and turn_angle == 0:
+            factor = 2
+        else:
+            if init_time < end_time:
+                factor = num_frames // (end_time - init_time)
             else:
-                frame = time
-                if frame % factor == 0 and not self._check_accumulate():
-                    objs = self.make_objects(frame=frame // factor, make_view=False)
-                    # gc.collect()
+                factor = num_frames
+
+        gc.collect()
+        
+        time = init_time
+        for time in range(num_frames):
+            frame = init_time + time // factor
+            if time > 0 and time % factor == 0:
+                objs = self.make_objects(frame, make_view=False)
+
             img = self.views.render(image_resx, image_resy, objs)
             
             file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
-                hist_img = self.histogram.get_save_image(frame // factor)
+                hist_img = self.histogram.get_save_image(frame)
                 img.alpha_composite(hist_img)
                 if self._check_accumulate():
                     hist_name = 'Accum_' + hist_name
                 hist_img.save(os.path.join(path, hist_name))
+                del hist_img
 
-            if init_time == end_time:
+            if num_frames == 1:
                 number_img = self._get_number_img()
                 img.alpha_composite(number_img, (10, image_resy - 40))
+                del number_img
 
             if self._check_accumulate():
                 file_name = 'Accum_' + file_name
-            img.save(os.path.join(path, file_name))
+            fname = os.path.join(path, file_name)
+            img.save(fname)
+            self.setStatus(f'Saving frame {file_name} of {num_frames}')
 
             if rotate:
                 self.views.rotate3DVideo(dx)
-                self.setStatus(f'Saving frame {time} / {end_time - init_time}')
             
-        self.histogram.end_save_image()
+            del img
 
-        # gc.collect()
+        if self.view_histogram:
+            self.histogram.end_save_image()
+
+        gc.collect(2)
         self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
-        if init_time != end_time:
+        if num_frames > 0:
 
             if not self._check_accumulate():
                 in_sequence_name = os.path.join(path, f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
                 main_video_name = os.path.join(path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
-                self.setStatus('Making main sequence video...')
+                self.setStatus('Making main video sequence...')
                 result = make_video(
                     ffmpeg_path, 
                     in_sequence_name, main_video_name, 
@@ -318,7 +323,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 in_sequence_name = os.path.join(path, f'Accum_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
                 main_video_name = os.path.join(path, f'Accum_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
-                self.setStatus('Making main sequence video...')
+                self.setStatus('Making main video sequence...')
                 result = make_video(
                     ffmpeg_path, 
                     in_sequence_name, main_video_name, 
@@ -345,25 +350,30 @@ class MainWindow(QtWidgets.QMainWindow):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         frame = self.time.value()
         image_path = self.config.get('image_path')
-        self._saveImages(image_path, frame, frame, subfolder)
+        self._saveImages(image_path, frame, frame, subfolder, num_frames=1)
         self.make_objects()
         app.restoreOverrideCursor()
 
-    def saveVideo(self):
+    def saveVideo(self, init_frame=0, end_frame=0, num_frames=0, turn_angle=0):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
-        if self._check_accumulate():
-            if self.views.mode in ['3D', '3DSPLIT'] and self.action3DTurntable.isChecked():
-                self._saveImages(image_path, 0, 50)
+        frame_rate = self.config.get('frame_rate')
+        if turn_angle > 0:
+            frame_rate = 25.0
+        if num_frames == 0:
+            if end_frame == 0:
+                num_frames = int(self.maxTime.value() * frame_rate)
             else:
-                self._saveImages(image_path, 0, 6)
+                num_frames = int((end_frame - init_frame) * frame_rate)
+        if end_frame == 0:
+            end_frame = self.maxTime.value()
+        if self._check_accumulate() and turn_angle == 0:
+            self._saveImages(image_path, 0, 6, num_frames=6)
         else:
-            factor = 1
-            if self.views.mode in ['3D', '3DSPLIT'] and self.action3DTurntable.isChecked():
-                factor = 6
-            self._saveImages(image_path, 0, self.maxTime.value() * factor)
+            self._saveImages(image_path, init_frame, end_frame, num_frames=num_frames, turn_angle=turn_angle)
         self.make_objects()
         app.restoreOverrideCursor()
+        gc.collect()
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
@@ -469,7 +479,7 @@ class MainWindow(QtWidgets.QMainWindow):
             del self.spacetime
             self.spacetime = None
         
-        gc.collect()
+        gc.collect(2)
 
         self.setStatus('Creating incremental spacetime...')
         self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
@@ -490,7 +500,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.make_objects()
 
-        gc.collect()
+        gc.collect(2)
         
         time2 = time.time()
         self.setStatus(f'Rationals set for number {n:,.0f} computed in {time2-time1:,.2f} secs')
@@ -558,9 +568,12 @@ class MainWindow(QtWidgets.QMainWindow):
         max_faces = self.config.get('max_faces')
         faces_pow = self.config.get('faces_pow')
 
+        if self.cell_ids:
+            del self.cell_ids
         self.cell_ids = {}
+        if self.objs:
+            del self.objs
         self.objs = {}
-        # self.config.resetKey()
 
         if self.actionViewObjects.isChecked():
             for cell in view_cells:
@@ -866,6 +879,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.saveImage(subfolder=subfolder)
                 print(f'------ number {number} saved')
         self.changed_spacetime = True
+
+    def turntableVideo(self):
+        if self.views.mode not in ['3D', '3DSPLIT']:
+            return
+        widget = TurntableVideoWidget(self, self.timeWidget.value())
+        widget.show()
+
+    def saveTurntableVideo(self, init_frame, end_frame, video_frames, turn_degrees):
+        self.saveVideo(init_frame, end_frame, num_frames=video_frames, turn_angle=turn_degrees)
 
     def save(self):
         number = int(self.number.value())
