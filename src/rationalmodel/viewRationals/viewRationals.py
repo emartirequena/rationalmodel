@@ -210,6 +210,9 @@ class MainWindow(QtWidgets.QMainWindow):
             frame_rate = self.config.get('frame_rate')
             if turn_angle > 0:
                 frame_rate = 25.0
+            elif num_frames > 0 and end_time > init_time:
+                frame_rate = float(end_time - init_time) / float(num_frames)
+                num_frames = end_time - init_time
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
         video_format = self.config.get('video_format')
@@ -231,9 +234,6 @@ class MainWindow(QtWidgets.QMainWindow):
             rotate = True
 
         factor = 1
-        # if self._check_accumulate() and turn_angle == 0:
-        #     factor = 2
-        # else:
         if init_time < end_time:
             factor = 1 + num_frames // (end_time - init_time + 1)
         else:
