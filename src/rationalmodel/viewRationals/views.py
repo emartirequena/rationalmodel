@@ -4,6 +4,7 @@ from PyQt5 import QtWidgets
 from madcad import rendering
 import numpy as np
 from PIL import Image, ImageDraw
+import gc
 
 from screenView import ScreenView
 from renderView import RenderView
@@ -15,8 +16,10 @@ class View(QtWidgets.QWidget):
         super().__init__()
         self.type = type
         self.scene = rendering.Scene()
+        self.render_scene = rendering.Scene()
         self.active = False
         self.view = ScreenView(mainWindow, self.scene, parent=parent)
+        self.render_view = rendering.View(self.render_scene)
         self.set_projection()
         self.set_navigation()
         self.layout = QtWidgets.QHBoxLayout()
@@ -100,6 +103,7 @@ class View(QtWidgets.QWidget):
             disp.selected = state if state is not None else not disp.selected
         self.view.update()
 
+    @timing
     def render(self, resx, resy, objs):
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
@@ -110,7 +114,11 @@ class View(QtWidgets.QWidget):
             view.resize((resx // 2, resy // 2))
         else:
             view.resize((resx, resy))
-        return view.render()
+        img = view.render()
+        del view
+        del scene
+        gc.collect()
+        return img
     
     def rotate3DView(self, dx):
         if self.type in ['3D', '3DVIEW']:
@@ -127,7 +135,7 @@ class Views(QtWidgets.QWidget):
     def __init__(self, mainWindow, parent=None) -> None:
         super().__init__(parent=parent)
         self.mode = ''
-        self.mode_3d = '3DSPLIT'
+        self.mode_3d = '3D'
         self.views = {}
         self.mainWindow = mainWindow
         self.navigation = None

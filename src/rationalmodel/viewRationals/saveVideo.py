@@ -1,8 +1,10 @@
 from PyQt5 import QtWidgets
 
-class TurntableVideoWidget(QtWidgets.QDialog):
-    def __init__(self, parent, current_frame) -> None:
+class SaveVideoWidget(QtWidgets.QDialog):
+    def __init__(self, parent, current_frame, views_mode, callback) -> None:
         super().__init__(parent)
+
+        self.callback = callback
         
         self.vlayout = QtWidgets.QVBoxLayout()
         self.gridlayout = QtWidgets.QGridLayout()
@@ -55,12 +57,16 @@ class TurntableVideoWidget(QtWidgets.QDialog):
 
         self.setWindowTitle('Turntable Video')
 
+        if views_mode not in ['3D', '3DSPLIT']:
+            self.turn_degrees.setValue(0)
+            self.turn_degrees.setEnabled(False)
+
     def save(self):
         if self.init_frame.value() > self.end_frame.value():
-            QtWidgets.QMessageBox.critical(self, 'End frame must be greater or equal than init frame')
+            QtWidgets.QMessageBox.critical(self, "ERROR", 'End frame must be greater or equal than init frame')
             return
         self.close()
-        self.parent().saveTurntableVideo(
+        self.callback(
             self.init_frame.value(), 
             self.end_frame.value(), 
             self.video_frames.value(),

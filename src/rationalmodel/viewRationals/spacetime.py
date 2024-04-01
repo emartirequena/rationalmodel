@@ -179,8 +179,9 @@ class Space(object):
 				l += 1
 		return l
 
+	@timing
 	def getCells(self):
-		size = 100
+		size = 80
 		l = self.countCells()
 		if l <= size:
 			return list(filter(lambda x: x.count > 0, self.cells))

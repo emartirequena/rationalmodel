@@ -3,7 +3,7 @@ import os
 from config import Config
 from openpyxl import Workbook
 
-from utils import getPeriod
+from utils import getPeriod, divisors
 
 
 def main():
@@ -78,5 +78,32 @@ def main2():
     print(f'Odd period 3d: {100.0 * num_p3d / divupper:5.2f}%')
 
 
+def main3():
+    divisors_count = 0
+    centrals_count = 0
+
+    print('  T    div  count central  count   ratio')
+    print('--- ------ ------ ------- ------ -------')
+
+    total_set = set()
+
+    for T in range(2, 46, 2):
+        divisors_set = set(divisors(8**T-1))
+        divisors_set.difference_update(total_set)
+        divisors_len = len(divisors_set)
+        divisors_count += divisors_len
+
+        centrals_set = set(divisors(8**(T//2)+1))
+        centrals_set.difference_update(total_set)
+        centrals_len = len(centrals_set)
+        centrals_count += centrals_len
+
+        total_set.update(divisors_set)
+
+        ratio = 100.0 * float(centrals_count) / float(divisors_count)
+
+        print(f'{T:3d} {divisors_len:6d} {divisors_count:6d} {centrals_len:7d} {centrals_count:6d}  {ratio:5,.2f}%')
+
+
 if __name__ == '__main__':
-    main2()
+    main3()

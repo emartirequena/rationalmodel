@@ -148,7 +148,7 @@ class MainWindowUI:
 
         mw.actionSaveVideo = QtWidgets.QAction('Save Video', mw)
         mw.actionSaveVideo.setShortcut('V')
-        mw.actionSaveVideo.triggered.connect(mw.saveVideo)
+        mw.actionSaveVideo.triggered.connect(mw.callSaveVideo)
         mw.menuUtils.addAction(mw.actionSaveVideo)
 
         mw.menuUtils.addSeparator()
@@ -208,13 +208,6 @@ class MainWindowUI:
         mw.actionTurntableSlower.setShortcut('-')
         mw.actionTurntableSlower.triggered.connect(mw.turntableSlower)
         mw.menuTurntable.addAction(mw.actionTurntableSlower)
-
-        mw.menuTurntable.addSeparator()
-
-        mw.actionTurntableVideo = QtWidgets.QAction('Turntable Video', mw)
-        mw.actionTurntableVideo.setShortcut('Ctrl+T')
-        mw.actionTurntableVideo.triggered.connect(mw.turntableVideo)
-        mw.menuTurntable.addAction(mw.actionTurntableVideo)
 
         mw.menu.addMenu(mw.menuTurntable)
 

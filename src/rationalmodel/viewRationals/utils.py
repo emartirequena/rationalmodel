@@ -5,7 +5,7 @@ from copy import copy
 import subprocess
 from PIL import Image
 from PyQt5 import QtGui
-
+from math import sqrt
 
 def lerp(t, ta, a, tb, b):
     return a + (b-a)*(t-ta)/(tb-ta)
@@ -81,7 +81,8 @@ def cartesianproduct(lists) :
 def primefactors(n: int) -> list[int]:
     """lists prime factors, from greatest to smallest"""
     i:int = 3
-    limit:int = n // (4 if n < 100000000 else 4096)
+    # limit:int = n // (4 if n < 100000000 else 4096)
+    limit:int = int(sqrt(float(n)))
     while i <= limit:
         if n % i == 0:
             lst: list[int] = primefactors(n // i)
