@@ -17,7 +17,7 @@ from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icospher
 from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
-from turntableVideo import TurntableVideoWidget
+from saveVideo import SaveVideoWidget
 from spacetime import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video
@@ -155,7 +155,6 @@ class MainWindow(QtWidgets.QMainWindow):
         print(f'status: {txt}')
         self.statusLabel.setText(str(txt))
         self.statusBar.show()
-        gc.collect()
         app.processEvents(QtCore.QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents)
 
     def _getDimStr(self):
@@ -189,7 +188,7 @@ class MainWindow(QtWidgets.QMainWindow):
         width = int(draw.textlength(string) + 10)
         img.resize((width, 40))
         font = ImageFont.FreeTypeFont('NotoMono-Regular.ttf', size=24)
-        draw.text((0, 0), string, font=font, fill=(0, 0, 0, 0))
+        draw.text((0, 0), string, font=font, fill=(0, 0, 0))
         return img
 
     def _saveImages(self, image_path, init_time, end_time, subfolder='', num_frames=0, turn_angle=0):
@@ -199,7 +198,7 @@ class MainWindow(QtWidgets.QMainWindow):
         period = self.period.value()
         factors = self.get_output_factors(number)
 
-        single_image = True if num_frames == 0 else False
+        single_image = True if num_frames == 1 else False
         path = self._makePath(image_path, period, number, single_image=single_image, subfolder=subfolder)
         image_resx = self.config.get('image_resx')
         image_resy = self.config.get('image_resy')
@@ -209,7 +208,7 @@ class MainWindow(QtWidgets.QMainWindow):
             frame_rate = self.config.get('frame_rate_accum')
         else:
             frame_rate = self.config.get('frame_rate')
-            if turn_angle > 0 and init_time == end_time:
+            if turn_angle > 0:
                 frame_rate = 25.0
         ffmpeg_path = self.config.get('ffmpeg_path')
         video_path = self.config.get('video_path')
@@ -230,23 +229,26 @@ class MainWindow(QtWidgets.QMainWindow):
             k = 0.005 * 400 / 360
             dx = k * turn_angle / num_frames
             rotate = True
-        objs = self.make_objects(frame=init_time, make_view=False)
 
         factor = 1
-        if self._check_accumulate() and turn_angle == 0:
-            factor = 2
+        # if self._check_accumulate() and turn_angle == 0:
+        #     factor = 2
+        # else:
+        if init_time < end_time:
+            factor = 1 + num_frames // (end_time - init_time + 1)
         else:
-            if init_time < end_time:
-                factor = num_frames // (end_time - init_time)
-            else:
-                factor = num_frames
+            factor = num_frames
 
         gc.collect()
         
+        objs = None
         time = init_time
         for time in range(num_frames):
             frame = init_time + time // factor
-            if time > 0 and time % factor == 0:
+            if time % factor == 0:
+                if objs:
+                    del objs
+                    gc.collect()
                 objs = self.make_objects(frame, make_view=False)
 
             img = self.views.render(image_resx, image_resy, objs)
@@ -268,9 +270,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if self._check_accumulate():
                 file_name = 'Accum_' + file_name
+
             fname = os.path.join(path, file_name)
             img.save(fname)
-            self.setStatus(f'Saving frame {file_name} of {num_frames}')
+            self.setStatus(f'Saving frame {file_name} of {num_frames} factor: {factor}')
 
             if rotate:
                 self.views.rotate3DVideo(dx)
@@ -280,11 +283,12 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.view_histogram:
             self.histogram.end_save_image()
 
-        gc.collect(2)
+        del objs
+        gc.collect()
         self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
-        if num_frames > 0:
+        if not single_image:
 
             if not self._check_accumulate():
                 in_sequence_name = os.path.join(path, f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
@@ -298,7 +302,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     image_resx, image_resy
                 )
                 if not result:
-                    self.setStatus('ffmepg not found... (check config.json file specification)')
+                    QtWidgets.QMessageBox.critical('ffmepg not found... (check config.json file specification)')
+                    self.setStatus('Error: ffmpeg not found...')
                     return
 
                 if self.view_histogram:
@@ -332,7 +337,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     image_resx, image_resy
                 )
                 if not result:
-                    self.setStatus('ffmepg not found... (check config.json file specification)')
+                    QtWidgets.QMessageBox.critical('ffmepg not found... (check config.json file specification)')
+                    self.setStatus('Error: ffmpeg not found...')
                     return
 
                 self.setStatus('Copying video...')
@@ -354,6 +360,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.make_objects()
         app.restoreOverrideCursor()
 
+    @timing
     def saveVideo(self, init_frame=0, end_frame=0, num_frames=0, turn_angle=0):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
@@ -364,7 +371,7 @@ class MainWindow(QtWidgets.QMainWindow):
             if end_frame == 0:
                 num_frames = int(self.maxTime.value() * frame_rate)
             else:
-                num_frames = int((end_frame - init_frame) * frame_rate)
+                num_frames = int((end_frame - init_frame + 1) * frame_rate)
         if end_frame == 0:
             end_frame = self.maxTime.value()
         if self._check_accumulate() and turn_angle == 0:
@@ -464,7 +471,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.make_objects()
             self.period_changed = False
             return
-        self.need_compute = False
 
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         time1 = time.time()
@@ -473,17 +479,19 @@ class MainWindow(QtWidgets.QMainWindow):
 
         n = int(self.number.value())
 
-        if self.spacetime is not None:
-            if self.histogram is not None:
-                self.histogram.set_spacetime(None)
-            del self.spacetime
-            self.spacetime = None
-        
-        gc.collect(2)
+        if self.changed_spacetime:
+            if self.spacetime is not None:
+                if self.histogram is not None:
+                    self.histogram.set_spacetime(None)
+                del self.spacetime
+                self.spacetime = None
 
-        self.setStatus('Creating incremental spacetime...')
-        self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
-        self.changed_spacetime = False
+            self.setStatus('Creating incremental spacetime...')
+            self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
+            self.changed_spacetime = False
+            self.need_compute = False
+
+        self.spacetime.clear()
 
         self.setStatus(f'Setting rational set for number: {n} ...')
         self.spacetime.setRationalSet(n, self.is_special)
@@ -500,7 +508,7 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self.make_objects()
 
-        gc.collect(2)
+        gc.collect()
         
         time2 = time.time()
         self.setStatus(f'Rationals set for number {n:,.0f} computed in {time2-time1:,.2f} secs')
@@ -574,6 +582,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.objs:
             del self.objs
         self.objs = {}
+        gc.collect()
 
         if self.actionViewObjects.isChecked():
             for cell in view_cells:
@@ -692,7 +701,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.histogram.set_time(frame, self._check_accumulate())
                 self.histogram.show()
         
-        # gc.collect()
         self.setStatus(f'{self.count} cells created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
 
     def fit_histogram(self):
@@ -782,7 +790,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_period_factors(self):
         self.setStatus('Computing divisors...')
-        self.changed_spacetime = True
+        # self.changed_spacetime = True
         self.need_compute = True
         T = int(self.period.value())
         self.spacetime = None
@@ -799,7 +807,6 @@ class MainWindow(QtWidgets.QMainWindow):
         return QtGui.QColor(*[int(255 * x) for x in self.config.get(color_name)])
 
     def fillDivisors(self, T: int):
-
         not_period = self._to_qt_list_color('list_color_not_period')
         not_period_prime = self._to_qt_list_color('list_color_not_period_prime')
         period_special = self._to_qt_list_color('list_color_period_special')
@@ -880,14 +887,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 print(f'------ number {number} saved')
         self.changed_spacetime = True
 
-    def turntableVideo(self):
-        if self.views.mode not in ['3D', '3DSPLIT']:
-            return
-        widget = TurntableVideoWidget(self, self.timeWidget.value())
+    def callSaveVideo(self):
+        widget = SaveVideoWidget(self, self.timeWidget.value(), self.views.mode, self.saveVideo)
         widget.show()
-
-    def saveTurntableVideo(self, init_frame, end_frame, video_frames, turn_degrees):
-        self.saveVideo(init_frame, end_frame, num_frames=video_frames, turn_angle=turn_degrees)
 
     def save(self):
         number = int(self.number.value())
@@ -935,9 +937,10 @@ class MainWindow(QtWidgets.QMainWindow):
             self.number.setValue(spacetime.n)
             self.is_special = spacetime.is_special
             self.maxTime.setValue(spacetime.max)
-            del self.objs
-            self.objs = None
-            # gc.collect()
+            if self.objs:
+                del self.objs
+            self.objs = {}
+            gc.collect()
             self.first_number_set = False
             self.changed_spacetime = False
             self.need_compute = False

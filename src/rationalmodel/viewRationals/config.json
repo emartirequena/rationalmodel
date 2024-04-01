@@ -21,7 +21,7 @@
     "rad_factor_accum": 4.0,
     "rad_pow_accum": 0.5,
     "rad_min": 0.03,
-    "max_faces": 6,
+    "max_faces": 5,
     "faces_pow": 0.2,
     "histogram_resx": 800,
     "histogram_resy": 150,
