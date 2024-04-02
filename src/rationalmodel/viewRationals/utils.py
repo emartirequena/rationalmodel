@@ -1,5 +1,4 @@
 import os
-import time
 from functools import reduce
 from copy import copy
 import subprocess

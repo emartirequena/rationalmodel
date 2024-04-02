@@ -18,7 +18,7 @@ from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
 from saveVideo import SaveVideoWidget
-from spacetime import SpaceTime, Cell
+from spacetime_hash import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video
 from timing import timing
