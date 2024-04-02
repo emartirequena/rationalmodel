@@ -39,7 +39,8 @@ class Config:
             'list_color_not_period': [0.5, 0.0, 0.0],
             'list_color_not_period_prime': [1.0, 0.0, 1.0],
             'list_color_period_special': [0.0, 1.0, 1.0],
-            'list_color_period_not_special': [0.0, 0.0, 1.0]
+            'list_color_period_not_special': [0.0, 0.0, 1.0],
+            'max_octtree_levels': 4
         }
         if os.path.exists(config_file):
             with open(config_file, 'rt') as fp:

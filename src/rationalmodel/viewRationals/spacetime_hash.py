@@ -5,10 +5,11 @@ import numpy as np
 
 from rationals import Rational, c
 from timing import timing
+from config import Config
 
 
 spacetime = None
-MAX_LEVELS = 4
+
 
 def eq_digits(q: str, r: str):
 	l = len(q)
@@ -135,7 +136,7 @@ class Bbox:
 	def get_subbox(self, index: str):
 		centre = (self.min + self.max) * 0.5
 		dist =   (self.max - self.min) * 0.5
-		delta = np.array([0, 0, 0])
+		delta = np.array([0., 0., 0.])
 		for i in range(3):
 			if index[i] == '1':
 				delta[i] = -dist[i]
@@ -164,7 +165,6 @@ class OctTreeItem:
 		self.bbox: Bbox = bbox
 		self.children: list[OctTreeItem] = []
 		self.level = level
-		# print(f'{t:2d} ' + '    '*level + str(bbox))
 		if level == max_level or level == t:
 			return
 		if self.dim == 1:
@@ -252,7 +252,9 @@ class Space(object):
 		if dim == 1: bbox = Bbox(np.array([-d,  0,  0]), np.array([d, 0, 0]))
 		if dim == 2: bbox = Bbox(np.array([-d, -d,  0]), np.array([d, d, 0]))
 		if dim == 3: bbox = Bbox(np.array([-d, -d, -d]), np.array([d, d, d]))
-		self.hash_tree = OctTree(dim, t, MAX_LEVELS, bbox)
+		config = Config()
+		max_octtree_levels = config.get('max_octtree_levels')	
+		self.hash_tree = OctTree(dim, t, max_octtree_levels, bbox)
 
 	def __del__(self):
 		del self.cells
@@ -516,9 +518,9 @@ class SpaceTime(object):
 
 if __name__ == '__main__':
 	dim = 1
-	T = 4
-	n = (2**dim)**int(T // 2) + 1
-	# n = 33
+	T = 6
+	# n = (2**dim)**int(T // 2) + 1
+	n = 63
 	print('Creating spacetime...')
 	spacetime = SpaceTime(T, n, T, dim=dim)
 	print(f'Set rational set for n={n}...')
