@@ -73,13 +73,15 @@ class HashRationals:
 
 
 class Cell(object):
-	def __init__(self, dim, T, n, x, y=0, z=0):
+	def __init__(self, dim, T, n, t, x, y=0, z=0):
 		self.dim = dim
 		self.T = T
 		self.n = n
+		self.t = t
 		self.x = x
 		self.y = y
 		self.z = z
+		self.key = f'{t:5.1f}{x:5.1f}{y:5.1f}{z:5.1f}'.format(t, x, y, z)
 		self.count = 0
 		self.time = 0.0
 		self.next_digits = dict(zip([x for x in range(2**self.dim)], [0 for _ in range(2**self.dim)]))
@@ -158,6 +160,106 @@ class Bbox:
 		return f'bbox({self.min}, {self.max})'
 
 
+def _insert_cell(cells: list[Cell], indexes: list[int], dim, T, n, t, x, y, z):
+
+	def cmp(at, ax, ay, az, bt, bx, by, bz):
+		if at < bt: return -1
+		if at > bt: return  1
+		if ax < bx: return -1
+		if ax > bx: return  1
+		if ay < by: return -1
+		if ay > by: return  1
+		if az < bz: return -1
+		if az > bz: return  1
+		return 0
+	
+	def insert_cell(cells: list[Cell], init, end, dim, T, n, t, x, y, z, cmp) -> int:
+		if len(cells) == 0:
+			cells.append(Cell(dim, T, n, t, x, y, z))
+			return 0
+		
+		cinit = cells[init]
+		res_init = cmp(cinit.t, cinit.x, cinit.y, cinit.z, t, x, y,z)
+
+		position = (init + end) // 2
+		cpos = cells[position]
+		res_position = cmp(cpos.t, cpos.x, cpos.y, cpos.z, t, x, y,z)
+		
+		if end == init:
+			if res_init < 0:
+				cells.insert(end, Cell(dim, T, n, t, x, y, z))
+				return end
+			elif res_init > 0:
+				cells.insert(init, Cell(dim, T, n, t, x, y, z))
+				return init
+			else:
+				return init
+		elif end == init + 1:
+			if res_init < 0:
+				cells.insert(end, Cell(dim, T, n, t, x, y, z))
+				return end
+			elif res_init > 0:
+				cells.insert(init, Cell(dim, T, n, t, x, y, z))
+				return init
+			else:
+				return init
+		else:
+			if res_position == 0:
+				return position
+			elif res_position > 0:
+				return insert_cell(cells, init, position, dim, T, n, t, x, y, z, cmp)
+			else:
+				return insert_cell(cells, position, end,  dim, T, n, t, x, y, z, cmp)
+
+	def insert_index(indexes: list[int], cells: list[Cell], init, end, cell_index: int, cmp):
+		if len(indexes) == 0:
+			indexes.append(cell_index)
+			return 0
+
+		ckey = cells[cell_index]
+		cinit = cells[indexes[init]]
+		position = (init + end) // 2
+		cpos = cells[indexes[position]]
+
+		res_init = cmp(
+			cinit.t, cinit.x, cinit.y, cinit.z,
+			ckey.t, ckey.x, ckey.y, ckey.z
+		)
+		res_position = cmp(
+			cpos.t, cpos.x, cpos.y, cpos.z,
+			ckey.t, ckey.x, ckey.y, ckey.z
+		)
+
+		if end == init:
+			if  res_init < 0:
+				indexes.insert(end, cell_index)
+				return end
+			elif res_init > 0:
+				indexes.insert(init, cell_index)
+				return init
+			else:
+				return init
+		elif end == init + 1:
+			if  res_init < 0:
+				indexes.insert(end, cell_index)
+				return end
+			elif res_init > 0:
+				indexes.insert(init, cell_index)
+				return init
+			else:
+				return init
+		else:
+			if res_position == 0:
+				return position
+			elif res_position > 0:
+				return insert_index(indexes, cells, init, position, cell_index, cmp)
+			else:
+				return insert_index(indexes, cells, position, end,  cell_index, cmp)
+
+	cell_index = insert_cell(cells, 0, len(cells), dim, T, n, t, x, y, z, cmp)
+	insert_index(indexes, cells, 0, len(indexes), cell_index, cmp)
+	return cells[cell_index]
+
 class OctTreeItem:
 	def __init__(self, dim: int, t: int, level: int, max_level: int, bbox: Bbox):
 		self.dim = dim
@@ -194,31 +296,18 @@ class OctTreeItem:
 	def get_cell(self, cells: list[Cell], dim, T, n, t, x, y=0, z=0) -> Cell | None:
 		if not self.bbox.inside(np.array([x, y, z])):
 			return None
-
 		if not self.children:
-			found_cell = None
-			for index in self.cells_indexes:
-				cell = cells[index]
-				d = np.array([cell.x, cell.y, cell.z]) - np.array([x, y, z])
-				if np.linalg.norm(d) < 0.1:
-					found_cell = cell
-					break
-			if found_cell:
-				return found_cell
-			cell = Cell(dim, T, n, x, y, z)
-			cells.append(cell)
-			self.cells_indexes.append(len(cells) - 1)
+			cell = _insert_cell(cells, self.cells_indexes, dim, T, n, t, x, y, z)
 			return cell
-
 		else:
 			for child in self.children:
 				cell = child.get_cell(cells, dim, T, n, t, x, y, z)
 				if cell:
 					return cell
-
 		return None
 	
 	def clear(self):
+		del self.cells_indexes
 		self.cells_indexes = []
 		for child in self.children:
 			child.clear()
@@ -334,6 +423,7 @@ class Spaces:
 			space.clear()
 		self.accumulates_even.clear()
 		self.accumulates_odd.clear()
+		gc.collect()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		if not accumulate:
@@ -527,7 +617,7 @@ if __name__ == '__main__':
 	spacetime.setRationalSet(n, is_special=True)
 	print('Add rational set...')
 	spacetime.addRationalSet()
-	print(f'Save test_1D_N{n}.json...')
-	spacetime.save(f'test_1D_N{n}.json')
-	print(f'Load test_1D_N{n}.json...')
-	spacetime.load(f'test_1D_N{n}.json')
+	# print(f'Save test_1D_N{n}.json...')
+	# spacetime.save(f'test_1D_N{n}.json')
+	# print(f'Load test_1D_N{n}.json...')
+	# spacetime.load(f'test_1D_N{n}.json')

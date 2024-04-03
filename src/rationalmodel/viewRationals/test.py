@@ -2,9 +2,10 @@ import json
 import os
 from config import Config
 from openpyxl import Workbook
+from random import randint
 
 from utils import getPeriod, divisors
-
+from timing import timing
 
 def main():
     config = Config()
@@ -105,5 +106,47 @@ def main3():
         print(f'{T:3d} {divisors_len:6d} {divisors_count:6d} {centrals_len:7d} {centrals_count:6d}  {ratio:5,.2f}%')
 
 
+@timing
+def main4():
+    def cmp_key(a, b):
+        if a < b:
+            return -1
+        elif a > b:
+            return 1
+        return 0
+
+    def find_insert(plist, init, end, key, cmp):
+        print(key, init, end)
+        if len(plist) == 0:
+            plist.append(key)
+            return 0
+        # elif end == init:
+        #     plist.insert(init, key)
+        #     return 
+        elif end == init + 1:
+            res = cmp(plist[init], key)
+            if res < 0:
+                plist.insert(end, key)
+                return end
+            elif res > 0:
+                plist.insert(init, key)
+                return init
+        else:
+            position = (init + end) // 2
+            res = cmp(plist[position], key)
+            if res == 0:
+                # plist.insert(position, key)
+                return position
+            elif res > 0:
+                return find_insert(plist, init, position, key, cmp)
+            else:
+                return find_insert(plist, position, end, key, cmp)
+
+    plist = [0, 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3]
+    n = 2
+    position = find_insert(plist, 0, len(plist), n, cmp_key)
+    print(n, position, plist)
+
+
 if __name__ == '__main__':
-    main3()
+    main4()
