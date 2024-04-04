@@ -18,11 +18,11 @@ from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
 from saveVideo import SaveVideoWidget
-from spacetime_hash import SpaceTime, Cell
+from spacetime_index import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video
 from timing import timing
-from config import Config
+from config import config
 from color import ColorLine
 from histogram import Histogram
 
@@ -56,7 +56,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.factors = ''
         self.num = 0
         self.numbers = {}
-        self.config = Config()
+        self.config = config
         self.color = None
         self.files_path = self.config.get('files_path')
         self.loadConfigColors()

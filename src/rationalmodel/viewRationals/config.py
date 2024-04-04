@@ -61,3 +61,6 @@ class Config:
     
     def resetKey(self):
         self.values['objects_key'] = 1
+
+
+config = Config()

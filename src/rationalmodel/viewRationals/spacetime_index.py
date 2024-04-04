@@ -1,11 +1,10 @@
 from multiprocessing import Pool, cpu_count, Pipe
 import json
 import gc
-import numpy as np
+import time
 
 from rationals import Rational, c
 from timing import timing
-from config import config
 
 
 spacetime = None
@@ -73,15 +72,13 @@ class HashRationals:
 
 
 class Cell(object):
-	def __init__(self, dim, T, n, t, x, y=0, z=0):
+	def __init__(self, dim, T, n, x, y=0, z=0):
 		self.dim = dim
 		self.T = T
 		self.n = n
-		self.t = t
 		self.x = x
 		self.y = y
 		self.z = z
-		self.key = f'{t:5.1f}{x:5.1f}{y:5.1f}{z:5.1f}'.format(t, x, y, z)
 		self.count = 0
 		self.time = 0.0
 		self.next_digits = dict(zip([x for x in range(2**self.dim)], [0 for _ in range(2**self.dim)]))
@@ -130,234 +127,52 @@ class Cell(object):
 				self.rationals.add(m, rational['m'], rational['digits'], rational['time'])
 
 
-class Bbox:
-	def __init__(self, bmin: np.array, bmax: np.array):
-		self.min = bmin
-		self.max = bmax
-
-	def get_subbox(self, index: str):
-		centre = (self.min + self.max) * 0.5
-		dist =   (self.max - self.min) * 0.5
-		delta = np.array([0., 0., 0.])
-		for i in range(3):
-			if index[i] == '1':
-				delta[i] = -dist[i]
-		bmin = centre   + delta
-		bmax = self.max + delta
-		return Bbox(bmin, bmax)
-
-	def inside(self, point: np.array):
-		if self.min[0] <= point[0] <= self.max[0] and\
-		   self.min[1] <= point[1] <= self.max[1] and\
-		   self.min[2] <= point[2] <= self.max[2]:
-			return True
-		return False
-	
-	def __str__(self) -> str:
-		return f'({self.min}, {self.max})'
-
-	def __repr__(self) -> str:
-		return f'bbox({self.min}, {self.max})'
-
-
-def _insert_cell(cells: list[Cell], indexes: list[int], dim, T, n, t, x, y, z):
-
-	def cmp(at, ax, ay, az, bt, bx, by, bz):
-		if at < bt: return -1
-		if at > bt: return  1
-		if ax < bx: return -1
-		if ax > bx: return  1
-		if ay < by: return -1
-		if ay > by: return  1
-		if az < bz: return -1
-		if az > bz: return  1
-		return 0
-	
-	def insert_cell(cells: list[Cell], init, end, dim, T, n, t, x, y, z, cmp) -> int:
-		if len(cells) == 0:
-			cells.append(Cell(dim, T, n, t, x, y, z))
-			return 0
-		
-		cinit = cells[init]
-		res_init = cmp(cinit.t, cinit.x, cinit.y, cinit.z, t, x, y,z)
-
-		position = (init + end) // 2
-		cpos = cells[position]
-		res_position = cmp(cpos.t, cpos.x, cpos.y, cpos.z, t, x, y,z)
-		
-		if end == init:
-			if res_init < 0:
-				cells.insert(end, Cell(dim, T, n, t, x, y, z))
-				return end
-			elif res_init > 0:
-				cells.insert(init, Cell(dim, T, n, t, x, y, z))
-				return init
-			else:
-				return init
-		elif end == init + 1:
-			if res_init < 0:
-				cells.insert(end, Cell(dim, T, n, t, x, y, z))
-				return end
-			elif res_init > 0:
-				cells.insert(init, Cell(dim, T, n, t, x, y, z))
-				return init
-			else:
-				return init
-		else:
-			if res_position == 0:
-				return position
-			elif res_position > 0:
-				return insert_cell(cells, init, position, dim, T, n, t, x, y, z, cmp)
-			else:
-				return insert_cell(cells, position, end,  dim, T, n, t, x, y, z, cmp)
-
-	def insert_index(indexes: list[int], cells: list[Cell], init, end, cell_index: int, cmp):
-		if len(indexes) == 0:
-			indexes.append(cell_index)
-			return 0
-
-		ckey = cells[cell_index]
-		cinit = cells[indexes[init]]
-		position = (init + end) // 2
-		cpos = cells[indexes[position]]
-
-		res_init = cmp(
-			cinit.t, cinit.x, cinit.y, cinit.z,
-			ckey.t, ckey.x, ckey.y, ckey.z
-		)
-		res_position = cmp(
-			cpos.t, cpos.x, cpos.y, cpos.z,
-			ckey.t, ckey.x, ckey.y, ckey.z
-		)
-
-		if end == init:
-			if  res_init < 0:
-				indexes.insert(end, cell_index)
-				return end
-			elif res_init > 0:
-				indexes.insert(init, cell_index)
-				return init
-			else:
-				return init
-		elif end == init + 1:
-			if  res_init < 0:
-				indexes.insert(end, cell_index)
-				return end
-			elif res_init > 0:
-				indexes.insert(init, cell_index)
-				return init
-			else:
-				return init
-		else:
-			if res_position == 0:
-				return position
-			elif res_position > 0:
-				return insert_index(indexes, cells, init, position, cell_index, cmp)
-			else:
-				return insert_index(indexes, cells, position, end,  cell_index, cmp)
-
-	cell_index = insert_cell(cells, 0, len(cells), dim, T, n, t, x, y, z, cmp)
-	insert_index(indexes, cells, 0, len(indexes), cell_index, cmp)
-	return cells[cell_index]
-
-class OctTreeItem:
-	def __init__(self, dim: int, t: int, level: int, max_level: int, bbox: Bbox):
-		self.dim = dim
-		self.cells_indexes: list[int] = []
-		self.bbox: Bbox = bbox
-		self.children: list[OctTreeItem] = []
-		self.level = level
-		if level == max_level or level >= t:
-			return
-		if self.dim == 1:
-			z = 0
-			y = 0
-			for x in range(2):
-				bbox = self.bbox.get_subbox(f'{x}{y}{z}')
-				self.children.append(OctTreeItem(dim, t, level+1, max_level, bbox))
-		elif self.dim == 2:
-			z = 0
-			for y in range(2):
-				for x in range(2):
-					bbox = self.bbox.get_subbox(f'{x}{y}{z}')
-					self.children.append(OctTreeItem(dim, t, level+1, max_level, bbox))
-		elif self.dim == 3:
-			for z in range(2):
-				for y in range(2):
-					for x in range(2):
-						bbox = self.bbox.get_subbox(f'{x}{y}{z}')
-						self.children.append(OctTreeItem(dim, t, level+1, max_level, bbox))
-
-	def __del__(self):
-		del self.cells_indexes
-		del self.bbox
-		del self.children
-
-	def get_cell(self, cells: list[Cell], dim, T, n, t, x, y=0, z=0) -> Cell | None:
-		if not self.bbox.inside(np.array([x, y, z])):
-			return None
-		if not self.children:
-			cell = _insert_cell(cells, self.cells_indexes, dim, T, n, t, x, y, z)
-			return cell
-		else:
-			for child in self.children:
-				cell = child.get_cell(cells, dim, T, n, t, x, y, z)
-				if cell:
-					return cell
-		return None
-	
-	def clear(self):
-		del self.cells_indexes
-		self.cells_indexes = []
-		for child in self.children:
-			child.clear()
-
-
-class OctTree:
-	def __init__(self, dim: int, t: int, max_levels: int, bbox: Bbox) -> None:
-		self.bbox = bbox
-		self.root = OctTreeItem(dim, t, 0, max_levels, self.bbox)
-
-	def __del__(self):
-		del self.root
-	
-	def get_cell(self, cells: list[Cell], dim, T, n, t, x, y=0, z=0) -> Cell:
-		return self.root.get_cell(cells, dim, T, n, t, x, y, z)
-	
-	def clear(self):
-		self.root.clear()
+def filterCells(list_cells: list[Cell]) -> list[Cell]:
+	cells = list(filter(lambda x: x.count > 0, list_cells))
+	return cells
 
 
 class Space(object):
-	def __init__(self, t, dim, T, n, max, name='normal'):
+	def __init__(self, t, dim, T, n, name='normal'):
 		self.t = t
 		self.T = T
 		self.n = n
 		self.dim = dim
 		self.name = name
 		self.base = 2**dim
+		self.indexes: list[int] = []
 		self.cells: list[Cell] = []
-		d = t * 0.5
-		if dim == 1: bbox = Bbox(np.array([-d,  0,  0]), np.array([d, 0, 0]))
-		if dim == 2: bbox = Bbox(np.array([-d, -d,  0]), np.array([d, d, 0]))
-		if dim == 3: bbox = Bbox(np.array([-d, -d, -d]), np.array([d, d, d]))
-		self.hash_tree = OctTree(dim, t, config.get('max_octtree_levels'), bbox)
+		if self.dim == 1:
+			for _ in range(t + 1):
+				self.indexes.append(-1)
+		elif self.dim == 2:
+			for _ in range(t + 1):
+				for _ in range(t + 1):
+					self.indexes.append(-1)
+		elif self.dim == 3:
+			for _ in range(t + 1):
+				for _ in range(t + 1):
+					for _ in range(t + 1):
+						self.indexes.append(-1)
 
 	def __del__(self):
 		del self.cells
-		del self.hash_tree
 
-	def getCell(self, x, y=0.0, z=0.0) -> Cell:
-		return self.hash_tree.get_cell(self.cells, self.dim, self.T, self.n, self.t, x, y, z)
-
+	def getCell(self, x, y=0.0, z=0.0):
+		nx =  c * self.t - x
+		ny = (c * self.t - y) if self.dim > 1 else 0.0
+		nz = (c * self.t - z) if self.dim > 2 else 0.0
+		n = int(nx + (self.t + 1) * (ny + (self.t + 1) * nz))
+		if self.indexes[n] < 0:
+			self.indexes[n] = len(self.cells)
+			self.cells.append(Cell(self.dim, self.T, self.n, x, y, z))
+		return self.cells[self.indexes[n]]
+	
 	def countCells(self):
-		l = 0
-		for cell in self.cells:
-			if cell.count > 0:
-				l += 1
-		return l
+		return len(self.cells)
 
-	def getCells(self) -> list[Cell]:
+	@timing
+	def getCells(self):
 		return self.cells
 
 	def add(self, time, reminders, digits, m, next_digit, x, y, z):
@@ -367,14 +182,13 @@ class Space(object):
 		cell.add(time, reminders, digits, m, next_digit)
 
 	def clear(self):
+		del self.cells
 		self.cells = []
-		self.hash_tree.clear()
+		for n in range(len(self.indexes)):
+			self.indexes[n] = -1
 
 	def save(self):
-		objs = []
-		for cell in self.cells:
-			objs.append(cell.get())
-		return objs
+		return self.cells
 	
 	def load(self, input: list[dict]):
 		self.clear()
@@ -389,9 +203,9 @@ class Spaces:
 		self.n = n
 		self.max = max
 		self.dim = dim
-		self.spaces = [Space(t, dim, T, n, max) for t in range(max + 1)]
-		self.accumulates_even = Space(max if T%2 == 0 else max-1, dim, T, n, max, name='even')
-		self.accumulates_odd  = Space(max if T%2 == 1 else max-1, dim, T, n, max, name='odd' )
+		self.spaces = [Space(t, dim, T, n) for t in range(max + 1)]
+		self.accumulates_even = Space(max if T%2 == 0 else max-1, dim, T, n, name='even')
+		self.accumulates_odd  = Space(max if T%2 == 1 else max-1, dim, T, n, name='odd' )
 
 	def __del__(self):
 		del self.spaces
@@ -605,17 +419,17 @@ class SpaceTime(object):
 
 
 if __name__ == '__main__':
-	dim = 1
-	T = 6
-	# n = (2**dim)**int(T // 2) + 1
-	n = 63
+	dim = 2
+	T = 8
+	n = (2**dim)**int(T) - 1
+	# n = 33
 	print('Creating spacetime...')
 	spacetime = SpaceTime(T, n, T, dim=dim)
 	print(f'Set rational set for n={n}...')
 	spacetime.setRationalSet(n, is_special=True)
 	print('Add rational set...')
 	spacetime.addRationalSet()
-	# print(f'Save test_1D_N{n}.json...')
-	# spacetime.save(f'test_1D_N{n}.json')
-	# print(f'Load test_1D_N{n}.json...')
-	# spacetime.load(f'test_1D_N{n}.json')
+	print(f'Save test_1D_N{n}.json...')
+	spacetime.save(f'test_1D_N{n}.json')
+	print(f'Load test_1D_N{n}.json...')
+	spacetime.load(f'test_1D_N{n}.json')
