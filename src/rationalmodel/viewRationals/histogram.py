@@ -6,7 +6,7 @@ import numpy as np
 import gc
 import time
 
-from config import Config
+from config import config
 from color import ColorLine
 from utils import pil2pixmap
 from timing import timing
@@ -212,7 +212,7 @@ class Histogram(QtWidgets.QWidget):
         self.accumulate = False
         self.moving = False
         if not parent:
-            self.config = Config()
+            self.config = config
         else:
             self.config = parent.config
         self.resx = self.config.get('histogram_resx')
