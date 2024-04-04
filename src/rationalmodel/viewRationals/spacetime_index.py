@@ -127,11 +127,6 @@ class Cell(object):
 				self.rationals.add(m, rational['m'], rational['digits'], rational['time'])
 
 
-def filterCells(list_cells: list[Cell]) -> list[Cell]:
-	cells = list(filter(lambda x: x.count > 0, list_cells))
-	return cells
-
-
 class Space(object):
 	def __init__(self, t, dim, T, n, name='normal'):
 		self.t = t
@@ -182,6 +177,8 @@ class Space(object):
 		cell.add(time, reminders, digits, m, next_digit)
 
 	def clear(self):
+		for cell in self.cells:
+			del cell
 		del self.cells
 		self.cells = []
 		for n in range(len(self.indexes)):
