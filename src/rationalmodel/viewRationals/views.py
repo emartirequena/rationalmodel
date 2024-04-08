@@ -4,7 +4,6 @@ from PyQt5 import QtWidgets
 from madcad import rendering
 import numpy as np
 from PIL import Image, ImageDraw
-import gc
 
 from screenView import ScreenView
 from renderView import RenderView
@@ -15,11 +14,11 @@ class View(QtWidgets.QWidget):
     def __init__(self, type: str, mainWindow, parent=None) -> None:
         super().__init__()
         self.type = type
-        self.scene = rendering.Scene()
-        self.render_scene = rendering.Scene()
         self.active = False
+        self.render_scene = None
+        self.render_view = None
+        self.scene = rendering.Scene(options=None)
         self.view = ScreenView(mainWindow, self.scene, parent=parent)
-        self.render_view = rendering.View(self.render_scene)
         self.set_projection()
         self.set_navigation()
         self.layout = QtWidgets.QHBoxLayout()
@@ -82,7 +81,7 @@ class View(QtWidgets.QWidget):
         self.set_projection()
         self.set_navigation()
         self.view.scene.displays.clear()
-        self.view.scene.update({})
+        self.view.scene.sync({})
         self.view.center()
         self.view.adjust()
         self.view.update()
@@ -105,19 +104,22 @@ class View(QtWidgets.QWidget):
 
     @timing
     def render(self, resx, resy, objs):
+        if not self.render_view:
+            self.render_scene = rendering.Scene(options=None)
+            self.render_view = RenderView(self.render_scene)
         projection = deepcopy(self.view.projection)
         navigation = deepcopy(self.view.navigation)
+        self.render_view.projection = projection
+        self.render_view.navigation = navigation
+        self.render_scene.sync(objs)
 
-        scene = rendering.Scene(objs, options=None)
-        view = RenderView(scene, projection=projection, navigation=navigation)
         if self.type in ['3DVIEW', '3DLEFT', '3DTOP', '3DFRONT']:
-            view.resize((resx // 2, resy // 2))
+            self.render_view.resize((resx // 2, resy // 2))
         else:
-            view.resize((resx, resy))
-        img = view.render()
-        del view
-        del scene
-        gc.collect()
+            self.render_view.resize((resx, resy))
+        img = self.render_view.render()
+        del projection
+        del navigation
         return img
     
     def rotate3DView(self, dx):
@@ -282,7 +284,8 @@ class Views(QtWidgets.QWidget):
 
     def render(self, resx, resy, objs):
         if self.mode != '3DSPLIT':
-            return self.views[self.mode].render(resx, resy, objs)
+            img = self.views[self.mode].render(resx, resy, objs)
+            return img
 
         background = Image.new('RGBA', (resx, resy), (180, 180, 180, 255))
         draw = ImageDraw.Draw(background)
@@ -296,4 +299,9 @@ class Views(QtWidgets.QWidget):
         background.alpha_composite(img_view,  dest=(resx // 2, resy // 2))
         draw.line((resx // 2, 0, resx // 2, resy), (180, 180, 180, 255), width=4)
         draw.line((0, resy // 2, resx, resy // 2), (180, 180, 180, 255), width=4)
+        del draw
+        del img_top
+        del img_front
+        del img_left
+        del img_view
         return background

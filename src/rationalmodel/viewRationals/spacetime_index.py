@@ -137,27 +137,23 @@ class Space(object):
 		self.base = 2**dim
 		self.indexes: list[int] = []
 		self.cells: list[Cell] = []
-		if self.dim == 1:
-			for _ in range(t + 1):
-				self.indexes.append(-1)
-		elif self.dim == 2:
-			for _ in range(t + 1):
-				for _ in range(t + 1):
-					self.indexes.append(-1)
-		elif self.dim == 3:
-			for _ in range(t + 1):
-				for _ in range(t + 1):
-					for _ in range(t + 1):
-						self.indexes.append(-1)
+		num = t + 1
+		if self.dim > 1:
+			num *= t + 1
+		if self.dim > 2:
+			num *= t + 1
+		self.indexes = [-1 for _ in range(num)]
 
 	def __del__(self):
 		del self.cells
 
-	def getCell(self, x, y=0.0, z=0.0):
+	def getCell(self, x, y, z):
 		nx =  c * self.t - x
 		ny = (c * self.t - y) if self.dim > 1 else 0.0
 		nz = (c * self.t - z) if self.dim > 2 else 0.0
 		n = int(nx + (self.t + 1) * (ny + (self.t + 1) * nz))
+		if n < 0 or n >= len(self.indexes):
+			return None
 		if self.indexes[n] < 0:
 			self.indexes[n] = len(self.cells)
 			self.cells.append(Cell(self.dim, self.T, self.n, x, y, z))
@@ -166,7 +162,6 @@ class Space(object):
 	def countCells(self):
 		return len(self.cells)
 
-	@timing
 	def getCells(self):
 		return self.cells
 
@@ -232,7 +227,6 @@ class Spaces:
 			space.clear()
 		self.accumulates_even.clear()
 		self.accumulates_odd.clear()
-		gc.collect()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		if not accumulate:
@@ -298,8 +292,24 @@ def add_rational(args):
 		next_digit = r.digit(t+rt+1)
 		time = r.time(t+rt)
 		obj = (t+rt, reminders, digits, m, next_digit, time, px, py, pz)
+		print('thread...', *obj)
 		conn.send(obj)
 	conn.send(None)
+
+def add_rational2(args):
+	_, rt, t, x, y, z = args
+	r: Rational = args[0]
+	px, py, pz = r.position(rt)
+	px += x
+	py += y
+	pz += z
+	reminders = r.reminders
+	digits = r.path()
+	m = r.m
+	next_digit = r.digit(t+rt+1)
+	time = r.time(t+rt)
+	obj = (t+rt, reminders, digits, m, next_digit, time, px, py, pz)
+	return obj
 
 
 class SpaceTime(object):
@@ -324,6 +334,7 @@ class SpaceTime(object):
 		self.n = 0
 		self.is_special = False
 		self.spaces.clear()
+		gc.collect()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		return self.spaces.getCell(t, x, y, z, accumulate)
@@ -365,30 +376,32 @@ class SpaceTime(object):
 		gc.collect()
 
 	@timing
-	def addRationalSet(self, t=0, x=0, y=0, z=0, count_rationals=True):
-		# conn1, conn2 = Pipe()
-		# p = Pool(cpu_count())
-		# params = []
-		# for r in self.rationalSet:
-		# 	params.append((conn1, self.max, r, t, x, y, z))
-		# p.imap(func=add_rational, iterable=params, chunksize=100000)
+	def addRationalSet(self, t=0, x=0, y=0, z=0):
+		algorithm = 0
+		if self.n >= 20000:
+			algorithm = 1
 
-		# count = 0
-		# while True:
-		# 	obj = conn2.recv()
-		# 	if obj is None:
-		# 		count += 1
-		# 	else:
-		# 		t, reminders, path, m, next_digit, time, px, py, pz = obj
-		# 		self.spaces.add(self.is_special, t, reminders, path, m, next_digit, time, self.T, px, py, pz)
-		# 	if count == len(params):
-		# 		break
+		if algorithm == 0:
+			for r in self.rationalSet:
+				self.add(r, t, x, y, z)
 
-		# p.close()
-		# p.join()
+		else:
+			p = Pool(cpu_count())
+			params = []
+			for r in self.rationalSet:
+				for rt in range(self.max + 1):
+					params.append((r, rt, t, x, y, z))
+			results = p.imap(func=add_rational2, iterable=params, chunksize=1000000)
 
-		for r in self.rationalSet:
-			self.add(r, t, x, y, z)
+			for result in results:
+				pt, reminders, digits, m, next_digit, time, px, py, pz = result
+				self.spaces.add(self.is_special, pt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
+
+			p.close()
+			p.join()
+			del params
+			del results
+			gc.collect()
 
 	@timing
 	def save(self, fname):
@@ -416,17 +429,17 @@ class SpaceTime(object):
 
 
 if __name__ == '__main__':
-	dim = 2
-	T = 8
+	dim = 1
+	T = 6
 	n = (2**dim)**int(T) - 1
-	# n = 33
+	n = 9
 	print('Creating spacetime...')
 	spacetime = SpaceTime(T, n, T, dim=dim)
 	print(f'Set rational set for n={n}...')
 	spacetime.setRationalSet(n, is_special=True)
 	print('Add rational set...')
 	spacetime.addRationalSet()
-	print(f'Save test_1D_N{n}.json...')
-	spacetime.save(f'test_1D_N{n}.json')
-	print(f'Load test_1D_N{n}.json...')
-	spacetime.load(f'test_1D_N{n}.json')
+	# print(f'Save test_1D_N{n}.json...')
+	# spacetime.save(f'test_1D_N{n}.json')
+	# print(f'Load test_1D_N{n}.json...')
+	# spacetime.load(f'test_1D_N{n}.json')

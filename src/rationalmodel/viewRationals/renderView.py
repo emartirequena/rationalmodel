@@ -2,11 +2,12 @@ import gc
 import numpy as np
 import moderngl as mgl
 from madcad import rendering, uvec2, fmat4
+from utils import collect
 
 
 class RenderView(rendering.Offscreen):
     def __init__(self, scene, size=uvec2(1920, 1080), navigation=None, projection=None, share=True, ctx=None):
-        self.scene = scene
+        self.scene: rendering.Scene = scene
         self.projection = projection
         self.navigation = navigation
 
@@ -20,7 +21,6 @@ class RenderView(rendering.Offscreen):
         self.map_depth = None
         self.map_idents = None
         self.fresh = set()	# set of refreshed internal variables since the last render
-        gc.collect()
 
         if not ctx:
             self.scene.ctx = mgl.create_standalone_context(share=share)
@@ -29,6 +29,17 @@ class RenderView(rendering.Offscreen):
 
         self.init(size)
         self.preload()
+
+    def __del__(self):
+        del self.scene
+        del self.uniforms
+        del self.targets
+        del self.steps
+        del self.map_depth
+        del self.map_idents
+        del self.projection
+        del self.navigation
+        collect('RenderView')
 
     def init(self, size):
         w, h = size
@@ -43,7 +54,6 @@ class RenderView(rendering.Offscreen):
                             ('ident', self.fb_ident, self.setup_ident)]
         self.map_ident = np.empty((h,w), dtype='u2')
         self.map_depth = np.empty((h,w), dtype='f4')
-        gc.collect()
 
     def resize(self, size):
         if size != self.fb_screen.size:

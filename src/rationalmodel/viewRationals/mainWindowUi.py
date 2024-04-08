@@ -25,7 +25,7 @@ class MainWindowUI:
         mw.timeWidget.setMaximum(100)
         mw.timeWidget.setTickInterval(1)
         mw.timeWidget.setTickPosition(QtWidgets.QSlider.TicksAbove)
-        mw.timeWidget.valueChanged.connect(mw.make_objects)
+        mw.timeWidget.valueChanged.connect(mw.draw_objects)
         mw.timeLayout.addWidget(mw.timeWidget)
 
         mw.time = QtWidgets.QSpinBox(mw)

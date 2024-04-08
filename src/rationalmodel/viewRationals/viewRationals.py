@@ -3,10 +3,9 @@ import sys
 import math
 import shutil
 import time
-from copy import deepcopy
-import gc
 from multiprocessing import freeze_support
 import math
+import gc
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
@@ -20,7 +19,7 @@ from saveSpecials import SaveSpecialsWidget
 from saveVideo import SaveVideoWidget
 from spacetime_index import SpaceTime, Cell
 from rationals import c
-from utils import getDivisorsAndFactors, divisors, make_video
+from utils import getDivisorsAndFactors, divisors, make_video, collect
 from timing import timing
 from config import config
 from color import ColorLine
@@ -38,7 +37,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.ui.setUpUi(self)
         self.dim = 3
         self.count = 0
-        self.objs = {}
         self.cell_ids = {}
         self.selected = {}
         self.views = None
@@ -81,9 +79,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.histogram.clear()
         else:
             self.make_view(0)
-        self.objs = {}
+        if self.cell_ids:
+            del self.cell_ids
         self.cell_ids = {}
+        if self.selected:
+            del self.selected
         self.selected = {}
+        collect('_clear_view')
         self.timer.stop()
 
     def _clear_parameters(self):
@@ -134,22 +136,26 @@ class MainWindow(QtWidgets.QMainWindow):
     def setTimeInit(self):
         print('------- set init time')
         self.timeWidget.setValue(0)
+        collect('setTimeInit')
 
     def setTimeEnd(self):
         print('------- set max time')
         self.timeWidget.setValue(self.maxTime.value())
+        collect('setTimeEnd')
 
     def decrementTime(self):
         print('------- decrement time...')
         t = self.timeWidget.value()
         if t > 0:
             self.timeWidget.setValue(t - 1)
+            collect('decrementTime')
 
     def incrementTime(self):
         print('------- increment time...')
         t = self.timeWidget.value()
         if t < self.maxTime.value():
             self.timeWidget.setValue(t + 1)
+            collect('incrementTime')
 
     def setStatus(self, txt: str):
         print(f'status: {txt}')
@@ -239,8 +245,6 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             factor = num_frames
 
-        gc.collect()
-        
         objs = None
         time = init_time
         for time in range(num_frames):
@@ -248,8 +252,8 @@ class MainWindow(QtWidgets.QMainWindow):
             if time % factor == 0:
                 if objs:
                     del objs
-                    gc.collect()
-                objs = self.make_objects(frame, make_view=False)
+                objs = self.make_objects(frame)
+                collect('del objs')
 
             img = self.views.render(image_resx, image_resy, objs)
             
@@ -273,18 +277,18 @@ class MainWindow(QtWidgets.QMainWindow):
 
             fname = os.path.join(path, file_name)
             img.save(fname)
+            del img
+            collect('del img')
             self.setStatus(f'Saving frame {file_name} of {num_frames} factor: {factor}')
 
             if rotate:
                 self.views.rotate3DVideo(dx)
             
-            del img
-
         if self.view_histogram:
             self.histogram.end_save_image()
 
         del objs
-        gc.collect()
+        collect('del objs')
         self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
@@ -357,7 +361,8 @@ class MainWindow(QtWidgets.QMainWindow):
         frame = self.time.value()
         image_path = self.config.get('image_path')
         self._saveImages(image_path, frame, frame, subfolder, num_frames=1)
-        self.make_objects()
+        self.draw_objects()
+        collect('saveImage')
         app.restoreOverrideCursor()
 
     @timing
@@ -378,9 +383,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self._saveImages(image_path, 0, 6, num_frames=6)
         else:
             self._saveImages(image_path, init_frame, end_frame, num_frames=num_frames, turn_angle=turn_angle)
-        self.make_objects()
+        self.draw_objects()
+        collect('SaveVideo')
         app.restoreOverrideCursor()
-        gc.collect()
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
@@ -409,7 +414,6 @@ class MainWindow(QtWidgets.QMainWindow):
         for count in self.selected:
             self._switch_display(count, False)
         self.selected = {}
-        # gc.collect()       
         self.refresh_selection()
 
     def reselect_cells(self):
@@ -468,7 +472,7 @@ class MainWindow(QtWidgets.QMainWindow):
         print(f'need_compute: {self.need_compute}, changed_spacetime: {self.changed_spacetime}')
         
         if not self.need_compute:
-            self.make_objects()
+            self.draw_objects()
             self.period_changed = False
             return
 
@@ -506,9 +510,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if self.time.value() != self.maxTime.value():
             self.time.setValue(self.maxTime.value())
         else:
-            self.make_objects()
+            self.draw_objects()
 
-        gc.collect()
+        collect('Compute')
         
         time2 = time.time()
         self.setStatus(f'Rationals set for number {n:,.0f} computed in {time2-time1:,.2f} secs')
@@ -539,7 +543,14 @@ class MainWindow(QtWidgets.QMainWindow):
         return v * cell.count
 
     @timing
-    def make_objects(self, frame:int=0, make_view:bool=True):
+    def draw_objects(self, frame=0):
+        self.make_objs(make_view=True)
+
+    @timing
+    def make_objects(self, frame):
+        return self.make_objs(frame, False)
+
+    def make_objs(self, frame:int=0, make_view:bool=True):
         if not self.spacetime:
             return
         if self.number.value() == 0:
@@ -576,13 +587,12 @@ class MainWindow(QtWidgets.QMainWindow):
         max_faces = self.config.get('max_faces')
         faces_pow = self.config.get('faces_pow')
 
+        config.resetKey()
+
         if self.cell_ids:
             del self.cell_ids
         self.cell_ids = {}
-        if self.objs:
-            del self.objs
-        self.objs = {}
-        gc.collect()
+        objs = {}
 
         if self.actionViewObjects.isChecked():
             for cell in view_cells:
@@ -603,7 +613,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 else:
                     obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
                 obj.option(color=color)
-                self.objs[id] = obj
+                objs[id] = obj
 
         if self.actionViewNextNumber.isChecked(): 
             min_dir = 1000000
@@ -643,7 +653,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 obj = cylinder(top, base, rad)
                 obj.option(color=color)
                 id = self.config.getKey()
-                self.objs[id] = obj
+                objs[id] = obj
 
                 base = top
                 top = base + dir * dir_len * 0.4
@@ -651,7 +661,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 obj = cone(top, base, rad) 
                 obj.option(color=color)
                 id = self.config.getKey()
-                self.objs[id] = obj
+                objs[id] = obj
 
         del view_cells
 
@@ -659,7 +669,7 @@ class MainWindow(QtWidgets.QMainWindow):
         for dir in dirs:
             axis = Axis(vec3(0), dir)
             id = self.config.getKey()
-            self.objs[id] = axis
+            objs[id] = axis
 
         if frame > 0 and self.dim > 1:
             if not self._check_accumulate():
@@ -668,15 +678,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 t = self.maxTime.value()
                 cube = Box(center=vec3(0), width=t if frame%2 == 0 else t+c)
             id = self.config.getKey()
-            self.objs[id] = cube
+            objs[id] = cube
 
         if make_view:
-            self.make_view(frame)
+            print(f'last key: {self.config.get("objects_key")}')
+            self.make_view(frame, objs)
+            return None
         else:
-            return self.objs
+            return objs
 
-    @timing
-    def make_view(self, frame):
+    def make_view(self, frame, objs=None):
+        objs = objs or {}
         if not self.views:
             print("view doesn't exists...")
             self.views = Views(self, parent=self)
@@ -685,7 +697,7 @@ class MainWindow(QtWidgets.QMainWindow):
         elif not self.first_number_set:
             print('setting first number...')
             self.first_number_set = True
-            self.views.initialize(self.objs)
+            self.views.initialize(objs)
             if not self.histogram: self.histogram = Histogram(parent=self)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
@@ -694,7 +706,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.histogram.show()
         else:
             print('continue setting number...')
-            self.views.reset(self.objs)
+            self.views.reset(objs)
             self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
             if self.view_histogram:
@@ -733,10 +745,13 @@ class MainWindow(QtWidgets.QMainWindow):
             return
         new_mode = names[(names.index(self.views.mode) + 1) % 2]
         self.views.set_mode(new_mode)
-        self.views.reinit(self.objs)
+        frame = self.time.value()
+        objs = self.make_objects(frame)
+        self.views.reinit(objs)
         self.reselect_cells()
         self.views.update()
         self.views.setFocus()
+        collect('swap_3d_view')
 
     def turntable(self):
         if self.views.mode not in ['3D', '3DSPLIT']:
@@ -856,7 +871,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.need_compute = True
 
     def update_view(self):
-        self.make_objects()
+        self.draw_objects()
 
     def saveSpecials(self):
         widget = SaveSpecialsWidget(self, self.period.value(), 61)
@@ -937,10 +952,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.number.setValue(spacetime.n)
             self.is_special = spacetime.is_special
             self.maxTime.setValue(spacetime.max)
-            if self.objs:
-                del self.objs
-            self.objs = {}
-            gc.collect()
             self.first_number_set = False
             self.changed_spacetime = False
             self.need_compute = False
@@ -952,6 +963,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
+    gc.disable()
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, False)
     app = QtWidgets.QApplication(sys.argv)
     freeze_support()
