@@ -114,6 +114,9 @@ class Rational():
     def __str__(self) -> str:
         return f'({self.m} / {self.n})'
     
+    def __repr__(self) -> str:
+        return f'Rational({self.m}, {self.n}, {self.dim})'
+    
     def __eq__(self, r) -> bool:
         l = len(self.reminders)
         for i in range(l):

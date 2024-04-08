@@ -1,4 +1,5 @@
 import os
+import gc
 from functools import reduce
 from copy import copy
 import subprocess
@@ -12,6 +13,14 @@ def lerp(t, ta, a, tb, b):
 
 def check_ffmpeg(ffmpeg_path: str) -> bool:
     return os.path.exists(ffmpeg_path)
+
+
+def collect(s=''):
+    if s:
+        print(f'Collect -> {s}')
+    print('Collect(2):', gc.collect(2))
+    print('Collect(1):', gc.collect(1))
+    print('Collect():',  gc.collect() )
 
 
 def pil2pixmap(img):
