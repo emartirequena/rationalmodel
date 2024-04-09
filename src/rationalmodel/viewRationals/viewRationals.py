@@ -136,26 +136,22 @@ class MainWindow(QtWidgets.QMainWindow):
     def setTimeInit(self):
         print('------- set init time')
         self.timeWidget.setValue(0)
-        collect('setTimeInit')
 
     def setTimeEnd(self):
         print('------- set max time')
         self.timeWidget.setValue(self.maxTime.value())
-        collect('setTimeEnd')
 
     def decrementTime(self):
         print('------- decrement time...')
         t = self.timeWidget.value()
         if t > 0:
             self.timeWidget.setValue(t - 1)
-            collect('decrementTime')
 
     def incrementTime(self):
         print('------- increment time...')
         t = self.timeWidget.value()
         if t < self.maxTime.value():
             self.timeWidget.setValue(t + 1)
-            collect('incrementTime')
 
     def setStatus(self, txt: str):
         print(f'status: {txt}')
@@ -171,12 +167,12 @@ class MainWindow(QtWidgets.QMainWindow):
         factors = self.get_output_factors(number)
         if self._check_accumulate():
             if not single_image:
-                path = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}')
+                path = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}', subfolder)
             else:
                 path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Accumulate', subfolder)
         else:
             if not single_image:
-                path  = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}')
+                path  = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}', subfolder)
             else:
                 path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Not Accumulate', subfolder)
         if os.path.exists(path) and not single_image:
@@ -197,7 +193,7 @@ class MainWindow(QtWidgets.QMainWindow):
         draw.text((0, 0), string, font=font, fill=(0, 0, 0))
         return img
 
-    def _saveImages(self, image_path, init_time, end_time, subfolder='', num_frames=0, turn_angle=0):
+    def _saveImages(self, image_path, init_time, end_time, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
         self.setStatus('Saving images...')
 
         number = int(self.number.value())
@@ -257,7 +253,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             img = self.views.render(image_resx, image_resy, objs)
             
-            file_name = f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.{time:04d}.png'
+            file_name = f'{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.{time:04d}.png'
             if self.view_histogram:
                 hist_name = 'Hist_' + file_name
                 hist_img = self.histogram.get_save_image(frame)
@@ -295,8 +291,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if not single_image:
 
             if not self._check_accumulate():
-                in_sequence_name = os.path.join(path, f'{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
-                main_video_name = os.path.join(path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.%04d.png')
+                main_video_name = os.path.join(path, f'{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
                 self.setStatus('Making main video sequence...')
                 result = make_video(
                     ffmpeg_path, 
@@ -311,8 +307,8 @@ class MainWindow(QtWidgets.QMainWindow):
                     return
 
                 if self.view_histogram:
-                    in_sequence_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
-                    hist_video_name = os.path.join(path, f'Hist_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
+                    in_sequence_name = os.path.join(path, f'Hist_{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.%04d.png')
+                    hist_video_name = os.path.join(path, f'Hist_{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
                     self.setStatus('Making histogram video...')
                     make_video(
                         ffmpeg_path, 
@@ -326,12 +322,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
                 if not os.path.exists(out_video_path):
                     os.makedirs(out_video_path)
-                dest_video_name = os.path.join(out_video_path, f'{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
+                dest_video_name = os.path.join(out_video_path, f'{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
                 shutil.copyfile(main_video_name, dest_video_name)
 
             else:
-                in_sequence_name = os.path.join(path, f'Accum_{self._getDimStr()}_N{number}_P{period:02d}_F{factors}.%04d.png')
-                main_video_name = os.path.join(path, f'Accum_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
+                in_sequence_name = os.path.join(path, f'Accum_{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.%04d.png')
+                main_video_name = os.path.join(path, f'Accum_{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
                 self.setStatus('Making main video sequence...')
                 result = make_video(
                     ffmpeg_path, 
@@ -349,7 +345,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
                 if not os.path.exists(out_video_path):
                     os.makedirs(out_video_path)
-                dest_video_name = os.path.join(out_video_path, f'Accum_{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}.{video_format}')
+                dest_video_name = os.path.join(out_video_path, f'Accum_{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
                 shutil.copyfile(main_video_name, dest_video_name)
 
             self.setStatus('Videos saved...')
@@ -366,7 +362,7 @@ class MainWindow(QtWidgets.QMainWindow):
         app.restoreOverrideCursor()
 
     @timing
-    def saveVideo(self, init_frame=0, end_frame=0, num_frames=0, turn_angle=0):
+    def saveVideo(self, init_frame=0, end_frame=0, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
         frame_rate = self.config.get('frame_rate')
@@ -380,9 +376,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if end_frame == 0:
             end_frame = self.maxTime.value()
         if self._check_accumulate() and turn_angle == 0:
-            self._saveImages(image_path, 0, 6, num_frames=6)
+            self._saveImages(image_path, 0, 6, subfolder=subfolder, prefix=prefix, suffix=suffix, num_frames=6)
         else:
-            self._saveImages(image_path, init_frame, end_frame, num_frames=num_frames, turn_angle=turn_angle)
+            self._saveImages(image_path, init_frame, end_frame, subfolder=subfolder, prefix=prefix, suffix=suffix, num_frames=num_frames, turn_angle=turn_angle)
         self.draw_objects()
         collect('SaveVideo')
         app.restoreOverrideCursor()
@@ -681,7 +677,6 @@ class MainWindow(QtWidgets.QMainWindow):
             objs[id] = cube
 
         if make_view:
-            print(f'last key: {self.config.get("objects_key")}')
             self.make_view(frame, objs)
             return None
         else:
