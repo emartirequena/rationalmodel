@@ -2,7 +2,7 @@ import os
 import sys
 import math
 import shutil
-import time
+from time import time
 from multiprocessing import freeze_support
 import math
 import gc
@@ -249,7 +249,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         objs = None
         time = init_time
-        for time in range(num_frames + 1):
+        for time in range(num_frames):
             frame = init_time + time // factor
             if time % factor == 0:
                 if objs:
@@ -364,6 +364,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @timing
     def saveVideo(self, init_frame=0, end_frame=0, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
+        init = time()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
         frame_rate = self.config.get('frame_rate')
@@ -382,6 +383,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self._saveImages(image_path, init_frame, end_frame, subfolder=subfolder, prefix=prefix, suffix=suffix, num_frames=num_frames, turn_angle=turn_angle)
         self.draw_objects()
         app.restoreOverrideCursor()
+        end = time()
+        self.setStatus(f'Video saved for number {self.number.value()} in {end-init:.2f} secs')
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
@@ -473,7 +476,7 @@ class MainWindow(QtWidgets.QMainWindow):
             return
 
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
-        time1 = time.time()
+        time1 = time()
 
         self.deselect_all()
 
@@ -510,7 +513,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         collect('Compute')
         
-        time2 = time.time()
+        time2 = time()
         self.setStatus(f'Rationals set for number {n:,.0f} computed in {time2-time1:,.2f} secs')
 
         app.restoreOverrideCursor()
@@ -918,12 +921,12 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         if out_name:
             self.setStatus(f'Saving file: {os.path.basename(out_name)}...')
-            time1 = time.time()
+            time1 = time()
             app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.spacetime.save(out_name)
             self.files_path = os.path.dirname(out_name)
             app.restoreOverrideCursor()
-            time2 = time.time()
+            time2 = time()
             self.setStatus(f'File {os.path.basename(out_name)} saved in {time2 - time1:0.2f} segs')
 
     def load(self):
@@ -931,7 +934,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self, 'Open number json file', self.files_path, '*.json'
         )
         if in_file_name:
-            time1 = time.time()
+            time1 = time()
             self.setStatus(f'Loading file {os.path.basename(in_file_name)}...')
             app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.files_path = os.path.dirname(in_file_name)
@@ -953,12 +956,11 @@ class MainWindow(QtWidgets.QMainWindow):
             self.time.setValue(spacetime.max)
             self.views.setFocus()
             app.restoreOverrideCursor()
-            time2 = time.time()
+            time2 = time()
             self.setStatus(f'File {os.path.basename(in_file_name)} loaded in {time2 - time1:0.2f} segs')
 
 
 if __name__=="__main__":
-    gc.disable()
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, False)
     app = QtWidgets.QApplication(sys.argv)
     freeze_support()
