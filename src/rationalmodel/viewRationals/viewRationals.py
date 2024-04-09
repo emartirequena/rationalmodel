@@ -183,10 +183,10 @@ class MainWindow(QtWidgets.QMainWindow):
             os.makedirs(path)
         return path
 
-    def _get_number_img(self):
+    def _get_number_img(self, frame):
         img = Image.new('RGBA', (500, 40), (255, 255, 255, 255))
         draw = ImageDraw.Draw(img)
-        string = f'number: {self.number.value():,.0f} period: {self.period.value():02d}'.replace(',', '.')
+        string = f'number: {self.number.value():,.0f} period: {self.period.value():02d} frame: {frame}'.replace(',', '.')
         width = int(draw.textlength(string) + 10)
         img.resize((width, 40))
         font = ImageFont.FreeTypeFont('NotoMono-Regular.ttf', size=24)
@@ -195,6 +195,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _saveImages(self, image_path, init_time, end_time, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
         self.setStatus('Saving images...')
+
+        if prefix and not '_' == prefix[-1]:
+            prefix = prefix + '_'
+
+        if suffix and not '_' == suffix[0]:
+            suffix = '_' + suffix
 
         number = int(self.number.value())
         period = self.period.value()
@@ -243,13 +249,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         objs = None
         time = init_time
-        for time in range(num_frames):
+        for time in range(num_frames + 1):
             frame = init_time + time // factor
             if time % factor == 0:
                 if objs:
                     del objs
                 objs = self.make_objects(frame)
-                collect('del objs')
 
             img = self.views.render(image_resx, image_resy, objs)
             
@@ -263,10 +268,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 hist_img.save(os.path.join(path, hist_name))
                 del hist_img
 
-            if num_frames == 1:
-                number_img = self._get_number_img()
-                img.alpha_composite(number_img, (10, image_resy - 40))
-                del number_img
+            number_img = self._get_number_img(frame)
+            img.alpha_composite(number_img, (10, image_resy - 40))
+            del number_img
 
             if self._check_accumulate():
                 file_name = 'Accum_' + file_name
@@ -274,7 +278,6 @@ class MainWindow(QtWidgets.QMainWindow):
             fname = os.path.join(path, file_name)
             img.save(fname)
             del img
-            collect('del img')
             self.setStatus(f'Saving frame {file_name} of {num_frames} factor: {factor}')
 
             if rotate:
@@ -284,7 +287,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.histogram.end_save_image()
 
         del objs
-        collect('del objs')
         self.setStatus('Images saved...')
 
         # if there are more tha one image, save video
@@ -358,7 +360,6 @@ class MainWindow(QtWidgets.QMainWindow):
         image_path = self.config.get('image_path')
         self._saveImages(image_path, frame, frame, subfolder, num_frames=1)
         self.draw_objects()
-        collect('saveImage')
         app.restoreOverrideCursor()
 
     @timing
@@ -380,7 +381,6 @@ class MainWindow(QtWidgets.QMainWindow):
         else:
             self._saveImages(image_path, init_frame, end_frame, subfolder=subfolder, prefix=prefix, suffix=suffix, num_frames=num_frames, turn_angle=turn_angle)
         self.draw_objects()
-        collect('SaveVideo')
         app.restoreOverrideCursor()
 
     def _switch_display(self, count, state=None):
