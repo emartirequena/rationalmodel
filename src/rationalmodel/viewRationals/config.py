@@ -15,7 +15,7 @@ class Config:
             'image_resy': 1080,
             'video_codec': 'prores',
             'video_format': 'mov',
-            'frame_rate': 1.0,
+            'frame_rate': 25.0,
             'frame_rate_accum': 0.5,
             'bit_rate': '20M',
             'colors': [

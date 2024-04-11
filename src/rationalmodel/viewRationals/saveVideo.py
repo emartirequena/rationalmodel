@@ -42,20 +42,20 @@ class SaveVideoWidget(QtWidgets.QDialog):
         self.turn_degrees.setValue(360)
         self.gridlayout.addWidget(self.turn_degrees, 3, 1)
 
-        self.label5 = QtWidgets.QLabel('Subfolder')
-        self.gridlayout.addWidget(self.label5, 4, 0)
-        self.subfolder = QtWidgets.QLineEdit(self)
-        self.gridlayout.addWidget(self.subfolder, 4, 1)
-
         self.label6 = QtWidgets.QLabel('Prefix')
-        self.gridlayout.addWidget(self.label6, 5, 0)
+        self.gridlayout.addWidget(self.label6, 4, 0)
         self.prefix = QtWidgets.QLineEdit(self)
-        self.gridlayout.addWidget(self.prefix, 5, 1)
+        self.gridlayout.addWidget(self.prefix, 4, 1)
 
         self.label7 = QtWidgets.QLabel('Suffix')
-        self.gridlayout.addWidget(self.label7, 6, 0)
+        self.gridlayout.addWidget(self.label7, 5, 0)
         self.suffix = QtWidgets.QLineEdit(self)
-        self.gridlayout.addWidget(self.suffix, 6, 1)
+        self.gridlayout.addWidget(self.suffix, 5, 1)
+
+        self.label5 = QtWidgets.QLabel('Subfolder')
+        self.gridlayout.addWidget(self.label5, 6, 0)
+        self.subfolder = QtWidgets.QLineEdit(self)
+        self.gridlayout.addWidget(self.subfolder, 6, 1)
 
         self.hlayout = QtWidgets.QHBoxLayout()
         self.hlayout.addStretch()

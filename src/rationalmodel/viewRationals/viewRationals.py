@@ -162,6 +162,18 @@ class MainWindow(QtWidgets.QMainWindow):
     def _getDimStr(self):
         dims = ['1D', '2D', '3D']
         return dims[self.dim - 1]
+    
+    def _del_folder(self, folder):
+        if not os.path.exists(folder):
+            return
+        names = os.listdir(folder)
+        for name in names:
+            path = os.path.join(folder, name)
+            if os.path.isdir(path):
+                self._del_folder(path)
+            else:
+                os.remove(path)
+        os.rmdir(folder)
 
     def _makePath(self, image_path, period, number, single_image=False, subfolder=''):
         factors = self.get_output_factors(number)
@@ -176,9 +188,7 @@ class MainWindow(QtWidgets.QMainWindow):
             else:
                 path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Not Accumulate', subfolder)
         if os.path.exists(path) and not single_image:
-            for name in os.listdir(path):
-                os.remove(os.path.join(path, name))
-            os.rmdir(path)
+            self._del_folder(path)
         if not os.path.exists(path):
             os.makedirs(path)
         return path
@@ -193,13 +203,13 @@ class MainWindow(QtWidgets.QMainWindow):
         draw.text((0, 0), string, font=font, fill=(0, 0, 0))
         return img
 
-    def _saveImages(self, image_path, init_time, end_time, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
+    def _saveImages(self, image_path, init_time, end_time, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0.):
         self.setStatus('Saving images...')
 
-        if prefix and not '_' == prefix[-1]:
+        if prefix and prefix[-1] != '_':
             prefix = prefix + '_'
 
-        if suffix and not '_' == suffix[0]:
+        if suffix and suffix[0] != '_':
             suffix = '_' + suffix
 
         number = int(self.number.value())
@@ -212,13 +222,11 @@ class MainWindow(QtWidgets.QMainWindow):
         image_resy = self.config.get('image_resy')
         histogram_resx = self.config.get('histogram_resx')
         histogram_resy = self.config.get('histogram_resy')
-        if self._check_accumulate() and turn_angle == 0:
+        if self._check_accumulate() and turn_angle == 0.:
             frame_rate = self.config.get('frame_rate_accum')
         else:
             frame_rate = self.config.get('frame_rate')
-            if turn_angle > 0:
-                frame_rate = 25.0
-            elif num_frames > 0 and end_time > init_time:
+            if turn_angle == 0.0 and num_frames > 1 and end_time > init_time:
                 frame_rate = float(end_time - init_time) / float(num_frames)
                 num_frames = end_time - init_time
         ffmpeg_path = self.config.get('ffmpeg_path')
@@ -236,9 +244,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
         rotate = False
         dx = 0.0
-        if (turn_angle > 0):
-            k = 0.005 * 400 / 360
-            dx = k * turn_angle / num_frames
+        if turn_angle > 0:
+            k = 0.005 * 400. / 360.
+            dx = k * float(turn_angle) / float(num_frames)
             rotate = True
 
         factor = 1
@@ -249,12 +257,14 @@ class MainWindow(QtWidgets.QMainWindow):
 
         objs = None
         time = init_time
-        for time in range(num_frames):
+        for time in range(num_frames + 1):
             frame = init_time + time // factor
             if time % factor == 0:
                 if objs:
                     del objs
                 objs = self.make_objects(frame)
+                if not objs:
+                    break
 
             img = self.views.render(image_resx, image_resy, objs)
             
@@ -364,6 +374,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @timing
     def saveVideo(self, init_frame=0, end_frame=0, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
+        if end_frame > self.maxTime.value():
+            QtWidgets.QMessageBox.critical(self, 'ERROR', 'End Frame cannot be greatest than Max Time')
+            return
         init = time()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
