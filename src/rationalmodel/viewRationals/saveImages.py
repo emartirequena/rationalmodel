@@ -2,7 +2,7 @@ import os
 import shutil
 import math
 import gc
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, cpu_count, Process
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icosphere, cone
@@ -93,16 +93,15 @@ def make_objects(spacetime, number, dim, accumulate, config, ccolor, view_object
 
     view_cells = spacetime.getCells(frame, accumulate=accumulate)
 
-    num_paths = 0
+    total = 0
     max = -1
     count = 0
     for cell in view_cells:
-        total = cell.count
-        if total > max:
-            max = total
-        if total > 0:
+        if cell.count > max:
+            max = cell.count
+        if cell.count > 0:
             count += 1
-        num_paths += total
+        total += cell.count
     
     if not accumulate:
         rad_factor = config.get('rad_factor')
@@ -131,7 +130,7 @@ def make_objects(spacetime, number, dim, accumulate, config, ccolor, view_object
             elif dim == 2:
                 obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
             else:
-                height = 14 * float(cell.count) / float(num_paths)
+                height = 14 * float(cell.count) / float(total)
                 obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, height))
             obj.option(color=color)
             objs[num_id] = obj
@@ -217,7 +216,7 @@ def _create_image(args):
     view.set_projection(projection)
     view.set_navigation(navigation)
     if rotate:
-        view.render_view.navigation.yaw = dx*math.pi
+        view.rotateTo3DVideo(dx)
 
     frame = init_time + time // factor
     objs = make_objects(spacetime, number, dim, accumulate, config, ccolor, view_objects, view_next_number, max_time, frame)
@@ -253,6 +252,7 @@ def _create_image(args):
 
 
 def _saveImages(args):
+        
     projection, navigation, image_path, init_time, end_time, \
     subfolder, prefix, suffix, num_frames, turn_angle, config, \
     ccolor, view_type, spacetime, dim, number, period, factors, \
@@ -314,9 +314,9 @@ def _saveImages(args):
             image_resx, image_resy, path, rotate, dx
         ))
 
-    num_cpus = min(cpu_count()-4, range_frames)
+    num_cpus = min(cpu_count()-6, range_frames)
     pool = Pool(num_cpus)
-    pool.imap(func=_create_image, iterable=params)
+    pool.imap(func=_create_image, iterable=params, chunksize=5)
     pool.close()
     pool.join()
 
@@ -347,4 +347,6 @@ def _saveImages(args):
         dest_video_name = os.path.join(out_video_path, f'{accum_str}{prefix}{dim_str}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
         print(f'------- copying {main_video_name} \n-------      to {dest_video_name}')
         shutil.copyfile(main_video_name, dest_video_name)
+
+    print(f'------- {max(gc.collect(2), gc.collect(1), gc.collect())} objects cleaned in saving video...')
 

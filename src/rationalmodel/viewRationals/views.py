@@ -3,6 +3,7 @@ from copy import deepcopy
 from PyQt5 import QtWidgets
 from madcad import rendering
 import numpy as np
+import math
 from PIL import Image, ImageDraw
 
 from screenView import ScreenView
@@ -35,6 +36,10 @@ class ViewRender:
     def rotate3DVideo(self, dx):
         if self.type in ['3D', '3DVIEW']:
             self.render_view.navigation.rotate(dx, 0, 0)
+
+    def rotateTo3DVideo(self, dx):
+        if self.type in ['3D', '3DVIEW']:
+            self.render_view.navigation.yaw = dx*math.pi
 
 
 class View(QtWidgets.QWidget):

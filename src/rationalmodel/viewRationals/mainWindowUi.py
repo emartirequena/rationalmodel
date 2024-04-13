@@ -151,6 +151,11 @@ class MainWindowUI:
         mw.actionSaveVideo.triggered.connect(mw.callSaveVideo)
         mw.menuUtils.addAction(mw.actionSaveVideo)
 
+        mw.actionCancelVideo = QtWidgets.QAction('Cancel Video', mw)
+        mw.actionCancelVideo.setShortcut('Ctrl+V')
+        mw.actionCancelVideo.triggered.connect(mw.cancelVideo)
+        mw.menuUtils.addAction(mw.actionCancelVideo)
+
         mw.menuUtils.addSeparator()
 
         mw.actionFitHistogram = QtWidgets.QAction('Fit Histogram', mw)
