@@ -1,7 +1,7 @@
 from PyQt5 import QtWidgets
 
 class SaveVideoWidget(QtWidgets.QDialog):
-    def __init__(self, parent, current_frame, views_mode, callback) -> None:
+    def __init__(self, parent, current_frame, max_time, views_mode, callback) -> None:
         super().__init__(parent)
 
         self.callback = callback
@@ -31,7 +31,7 @@ class SaveVideoWidget(QtWidgets.QDialog):
         self.video_frames = QtWidgets.QSpinBox(self)
         self.video_frames.setMinimum(0)
         self.video_frames.setMaximum(10000)
-        self.video_frames.setValue(100)
+        self.video_frames.setValue(300)
         self.gridlayout.addWidget(self.video_frames, 2, 1)
 
         self.label4 = QtWidgets.QLabel('Turn degrees')
@@ -73,6 +73,9 @@ class SaveVideoWidget(QtWidgets.QDialog):
         self.setWindowTitle('Turntable Video')
 
         if views_mode not in ['3D', '3DSPLIT']:
+            self.init_frame.setValue(0)
+            self.end_frame.setValue(max_time)
+            self.video_frames.setValue(max_time)
             self.turn_degrees.setValue(0)
             self.turn_degrees.setEnabled(False)
 

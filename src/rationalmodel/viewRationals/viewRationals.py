@@ -1,15 +1,14 @@
 import os
 import sys
 import math
-from time import time
-from multiprocessing import freeze_support
+from time import time, sleep
+from multiprocessing import freeze_support, active_children, Process
 import math
-from threading import Thread
+from threading import Thread, Event
 from copy import deepcopy
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
-from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icosphere, cone
 
@@ -29,6 +28,19 @@ from saveImages import _saveImages
 settings_file = r'settings.txt'
 
 opengl_version = (3,3)
+
+
+class VideoThread(Thread):
+    def __init__(self, func, args):
+        super().__init__()
+        self.func = func
+        self.args = args
+    
+    def run(self):
+        self.func(self.args)
+
+    def kill(self):
+        print('------- KILL VIDEO...')
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -52,6 +64,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view_objects = True
         self.view_next_number = False
         self.spacetime = None
+        self.video_thread = None
         self.factors = ''
         self.num = 0
         self.numbers = {}
@@ -176,8 +189,8 @@ class MainWindow(QtWidgets.QMainWindow):
         if end_frame > self.maxTime.value():
             QtWidgets.QMessageBox.critical(self, 'ERROR', 'End Frame cannot be greatest than Max Time')
             return
-        init = time()
         self.deselect_all()
+
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
         frame_rate = self.config.get('frame_rate')
@@ -195,7 +208,7 @@ class MainWindow(QtWidgets.QMainWindow):
             end_frame = 6
             num_frames = 6
 
-        args = [(
+        args = (
             deepcopy(self.views.views[self.views.mode].view.projection),
             deepcopy(self.views.views[self.views.mode].view.navigation),
             image_path,
@@ -209,7 +222,7 @@ class MainWindow(QtWidgets.QMainWindow):
             config,
             self.color,
             self.views.views[self.views.mode].type,
-            self.spacetime,
+            deepcopy(self.spacetime),
             self.dim,
             self.number.value(),
             self.period.value(),
@@ -219,15 +232,19 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actionViewObjects.isChecked(),
             self.actionViewNextNumber.isChecked(),
             self.maxTime.value()
-        )]
+        )
 
-        thread = Thread(target=_saveImages, args=args)
-        thread.start()
+        self.video_thread = VideoThread(_saveImages, args)
+        self.video_thread.start()
+
+        # self.video_thread = Thread(target=_saveImages, args=[args])
+        # self.video_thread.start()
 
         app.restoreOverrideCursor()
-        end = time()
-        if num_frames > 1:
-            self.setStatus(f'Video saved for number {int(self.number.value()):d} in {end-init:.2f} secs')
+
+    def cancelVideo(self):
+        if self.video_thread:
+            self.video_thread.kill()
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
@@ -746,7 +763,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.changed_spacetime = True
 
     def callSaveVideo(self):
-        widget = SaveVideoWidget(self, self.timeWidget.value(), self.views.mode, self.saveVideo)
+        widget = SaveVideoWidget(self, self.timeWidget.value(), self.maxTime.value(), self.views.mode, self.saveVideo)
         widget.show()
 
     def save(self):
