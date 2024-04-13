@@ -93,16 +93,16 @@ def make_objects(spacetime, number, dim, accumulate, config, ccolor, view_object
 
     view_cells = spacetime.getCells(frame, accumulate=accumulate)
 
-    num = 0
+    num_paths = 0
     max = -1
     count = 0
     for cell in view_cells:
-        num = cell.count
-        if num > max:
-            max = num
-        if num > 0:
+        total = cell.count
+        if total > max:
+            max = total
+        if total > 0:
             count += 1
-        num += num
+        num_paths += total
     
     if not accumulate:
         rad_factor = config.get('rad_factor')
@@ -131,7 +131,7 @@ def make_objects(spacetime, number, dim, accumulate, config, ccolor, view_object
             elif dim == 2:
                 obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
             else:
-                height = 5 * float(cell.count) / float(num)
+                height = 14 * float(cell.count) / float(num_paths)
                 obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, height))
             obj.option(color=color)
             objs[num_id] = obj
