@@ -39,7 +39,7 @@ class RenderView(rendering.Offscreen):
         del self.map_idents
         del self.projection
         del self.navigation
-        collect('RenderView')
+        gc.collect()
 
     def init(self, size):
         w, h = size
