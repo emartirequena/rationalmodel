@@ -1,11 +1,11 @@
 import os
 import sys
 import math
-import shutil
 from time import time
 from multiprocessing import freeze_support
 import math
-import gc
+from threading import Thread
+from copy import deepcopy
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
@@ -24,6 +24,7 @@ from timing import timing
 from config import config
 from color import ColorLine
 from histogram import Histogram
+from saveImages import _saveImages
 
 settings_file = r'settings.txt'
 
@@ -162,222 +163,21 @@ class MainWindow(QtWidgets.QMainWindow):
     def _getDimStr(self):
         dims = ['1D', '2D', '3D']
         return dims[self.dim - 1]
-    
-    def _del_folder(self, folder):
-        if not os.path.exists(folder):
-            return
-        names = os.listdir(folder)
-        for name in names:
-            path = os.path.join(folder, name)
-            if os.path.isdir(path):
-                self._del_folder(path)
-            else:
-                os.remove(path)
-        os.rmdir(folder)
-
-    def _makePath(self, image_path, period, number, single_image=False, subfolder=''):
-        factors = self.get_output_factors(number)
-        if self._check_accumulate():
-            if not single_image:
-                path = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), 'Accumulate', f'N{number:d}_F{factors}', subfolder)
-            else:
-                path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Accumulate', subfolder)
-        else:
-            if not single_image:
-                path  = os.path.join(image_path, f'P{period:02d}', self._getDimStr(), f'N{number:d}_F{factors}', subfolder)
-            else:
-                path = os.path.join(image_path, 'Snapshots', self._getDimStr(), 'Not Accumulate', subfolder)
-        if os.path.exists(path) and not single_image:
-            self._del_folder(path)
-        if not os.path.exists(path):
-            os.makedirs(path)
-        return path
-
-    def _get_number_img(self, frame):
-        img = Image.new('RGBA', (500, 40), (255, 255, 255, 255))
-        draw = ImageDraw.Draw(img)
-        string = f'number: {self.number.value():,.0f} period: {self.period.value():02d} frame: {frame}'.replace(',', '.')
-        width = int(draw.textlength(string) + 10)
-        img.resize((width, 40))
-        font = ImageFont.FreeTypeFont('NotoMono-Regular.ttf', size=24)
-        draw.text((0, 0), string, font=font, fill=(0, 0, 0))
-        return img
-
-    def _saveImages(self, image_path, init_time, end_time, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0.):
-        self.setStatus('Saving images...')
-
-        if prefix and prefix[-1] != '_':
-            prefix = prefix + '_'
-
-        if suffix and suffix[0] != '_':
-            suffix = '_' + suffix
-
-        number = int(self.number.value())
-        period = self.period.value()
-        factors = self.get_output_factors(number)
-
-        single_image = True if num_frames == 1 else False
-        path = self._makePath(image_path, period, number, single_image=single_image, subfolder=subfolder)
-        image_resx = self.config.get('image_resx')
-        image_resy = self.config.get('image_resy')
-        histogram_resx = self.config.get('histogram_resx')
-        histogram_resy = self.config.get('histogram_resy')
-        if self._check_accumulate() and turn_angle == 0.:
-            frame_rate = self.config.get('frame_rate_accum')
-        else:
-            frame_rate = self.config.get('frame_rate')
-            if turn_angle == 0.0 and num_frames > 1 and end_time > init_time:
-                frame_rate = float(end_time - init_time) / float(num_frames)
-                num_frames = end_time - init_time
-        ffmpeg_path = self.config.get('ffmpeg_path')
-        video_path = self.config.get('video_path')
-        video_format = self.config.get('video_format')
-        video_codec = self.config.get('video_codec')
-        bit_rate = self.config.get('bit_rate')
-        self.setStatus(f'res: {image_resx}x{image_resy} at {frame_rate:0.1f} fps...')
-
-        if num_frames == 0:
-            num_frames = end_time - init_time + 1
-
-        if self.view_histogram:
-            self.histogram.prepare_save_image()
-
-        rotate = False
-        dx = 0.0
-        if turn_angle > 0:
-            k = 0.005 * 400. / 360.
-            dx = k * float(turn_angle) / float(num_frames)
-            rotate = True
-
-        factor = 1
-        if init_time < end_time:
-            factor = 1 + num_frames // (end_time - init_time + 1)
-        else:
-            factor = num_frames
-
-        objs = None
-        time = init_time
-        for time in range(num_frames + 1):
-            frame = init_time + time // factor
-            if time % factor == 0:
-                if objs:
-                    del objs
-                objs = self.make_objects(frame)
-                if not objs:
-                    break
-
-            img = self.views.render(image_resx, image_resy, objs)
-            
-            file_name = f'{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.{time:04d}.png'
-            if self.view_histogram:
-                hist_name = 'Hist_' + file_name
-                hist_img = self.histogram.get_save_image(frame)
-                img.alpha_composite(hist_img)
-                if self._check_accumulate():
-                    hist_name = 'Accum_' + hist_name
-                hist_img.save(os.path.join(path, hist_name))
-                del hist_img
-
-            number_img = self._get_number_img(frame)
-            img.alpha_composite(number_img, (10, image_resy - 40))
-            del number_img
-
-            if self._check_accumulate():
-                file_name = 'Accum_' + file_name
-
-            fname = os.path.join(path, file_name)
-            img.save(fname)
-            del img
-            self.setStatus(f'Saving frame {file_name} of {num_frames} factor: {factor}')
-
-            if rotate:
-                self.views.rotate3DVideo(dx)
-            
-        if self.view_histogram:
-            self.histogram.end_save_image()
-
-        del objs
-        self.setStatus('Images saved...')
-
-        # if there are more tha one image, save video
-        if not single_image:
-
-            if not self._check_accumulate():
-                in_sequence_name = os.path.join(path, f'{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.%04d.png')
-                main_video_name = os.path.join(path, f'{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
-                self.setStatus('Making main video sequence...')
-                result = make_video(
-                    ffmpeg_path, 
-                    in_sequence_name, main_video_name, 
-                    video_codec, video_format, 
-                    frame_rate, bit_rate, 
-                    image_resx, image_resy
-                )
-                if not result:
-                    QtWidgets.QMessageBox.critical('ffmepg not found... (check config.json file specification)')
-                    self.setStatus('Error: ffmpeg not found...')
-                    return
-
-                if self.view_histogram:
-                    in_sequence_name = os.path.join(path, f'Hist_{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.%04d.png')
-                    hist_video_name = os.path.join(path, f'Hist_{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
-                    self.setStatus('Making histogram video...')
-                    make_video(
-                        ffmpeg_path, 
-                        in_sequence_name, hist_video_name, 
-                        video_codec, video_format, 
-                        frame_rate, bit_rate, 
-                        histogram_resx, histogram_resy
-                    )
-
-                self.setStatus('Copying video...')
-                out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
-                if not os.path.exists(out_video_path):
-                    os.makedirs(out_video_path)
-                dest_video_name = os.path.join(out_video_path, f'{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
-                shutil.copyfile(main_video_name, dest_video_name)
-
-            else:
-                in_sequence_name = os.path.join(path, f'Accum_{prefix}{self._getDimStr()}_N{number}_P{period:02d}_F{factors}{suffix}.%04d.png')
-                main_video_name = os.path.join(path, f'Accum_{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
-                self.setStatus('Making main video sequence...')
-                result = make_video(
-                    ffmpeg_path, 
-                    in_sequence_name, main_video_name, 
-                    video_codec, video_format, 
-                    frame_rate, bit_rate, 
-                    image_resx, image_resy
-                )
-                if not result:
-                    QtWidgets.QMessageBox.critical('ffmepg not found... (check config.json file specification)')
-                    self.setStatus('Error: ffmpeg not found...')
-                    return
-
-                self.setStatus('Copying video...')
-                out_video_path = os.path.join(video_path, f'{self._getDimStr()}')
-                if not os.path.exists(out_video_path):
-                    os.makedirs(out_video_path)
-                dest_video_name = os.path.join(out_video_path, f'Accum_{prefix}{self._getDimStr()}_N{number:d}_P{period:02d}_F{factors}{suffix}.{video_format}')
-                shutil.copyfile(main_video_name, dest_video_name)
-
-            self.setStatus('Videos saved...')
 
     def saveImage(self, subfolder=''):
         if subfolder == False: subfolder = ''
-        self.deselect_all()
-        app.setOverrideCursor(QtCore.Qt.WaitCursor)
-        frame = self.time.value()
-        image_path = self.config.get('image_path')
-        self._saveImages(image_path, frame, frame, subfolder, num_frames=1)
-        self.draw_objects()
-        app.restoreOverrideCursor()
+        frame = int(self.time.value())
+        self.saveVideo(init_frame=frame, end_frame=frame, subfolder=subfolder, num_frames=1)
 
-    @timing
     def saveVideo(self, init_frame=0, end_frame=0, subfolder='', prefix='', suffix='', num_frames=0, turn_angle=0):
+        if self.views.mode not in ['1D', '2D', '3D']:
+            QtWidgets.QMessageBox.critical(self, 'ERROR', 'Split 3D view is not allowed for videos')
+            return
         if end_frame > self.maxTime.value():
             QtWidgets.QMessageBox.critical(self, 'ERROR', 'End Frame cannot be greatest than Max Time')
             return
         init = time()
+        self.deselect_all()
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
         frame_rate = self.config.get('frame_rate')
@@ -390,14 +190,44 @@ class MainWindow(QtWidgets.QMainWindow):
                 num_frames = int((end_frame - init_frame + 1) * frame_rate)
         if end_frame == 0:
             end_frame = self.maxTime.value()
-        if self._check_accumulate() and turn_angle == 0:
-            self._saveImages(image_path, 0, 6, subfolder=subfolder, prefix=prefix, suffix=suffix, num_frames=6)
-        else:
-            self._saveImages(image_path, init_frame, end_frame, subfolder=subfolder, prefix=prefix, suffix=suffix, num_frames=num_frames, turn_angle=turn_angle)
-        self.draw_objects()
+        if self._check_accumulate() and turn_angle == 0 and num_frames > 1:
+            init_frame = 0
+            end_frame = 6
+            num_frames = 6
+
+        args = [(
+            deepcopy(self.views.views[self.views.mode].view.projection),
+            deepcopy(self.views.views[self.views.mode].view.navigation),
+            image_path,
+            init_frame,
+            end_frame,
+            subfolder,
+            prefix,
+            suffix,
+            num_frames,
+            turn_angle,
+            config,
+            self.color,
+            self.views.views[self.views.mode].type,
+            self.spacetime,
+            self.dim,
+            self.number.value(),
+            self.period.value(),
+            self.get_output_factors(self.number.value()),
+            self._check_accumulate(),
+            self._getDimStr(),
+            self.actionViewObjects.isChecked(),
+            self.actionViewNextNumber.isChecked(),
+            self.maxTime.value()
+        )]
+
+        thread = Thread(target=_saveImages, args=args)
+        thread.start()
+
         app.restoreOverrideCursor()
         end = time()
-        self.setStatus(f'Video saved for number {self.number.value()} in {end-init:.2f} secs')
+        if num_frames > 1:
+            self.setStatus(f'Video saved for number {int(self.number.value()):d} in {end-init:.2f} secs')
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
@@ -531,12 +361,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         app.restoreOverrideCursor()
 
-    def _get_next_number_dir(self, cell: Cell):
-        if self.dim == 1:
+    @staticmethod
+    def _get_next_number_dir(dim, cell: Cell):
+        if dim == 1:
             v1 = np.array([ 1,  0,  0]) * cell.next_digits[0]
             v2 = np.array([-1,  0,  0]) * cell.next_digits[1]
             v = (v1 + v2) / 2.0
-        elif self.dim == 2:
+        elif dim == 2:
             v1 = np.array([ 1,  0,  1]) * cell.next_digits[0]
             v2 = np.array([-1,  0,  1]) * cell.next_digits[1]
             v3 = np.array([ 1,  0, -1]) * cell.next_digits[2]
@@ -556,11 +387,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @timing
     def draw_objects(self, frame=0):
-        self.make_objs(make_view=True)
+        self.make_objs(frame, make_view=True)
 
     @timing
-    def make_objects(self, frame):
-        return self.make_objs(frame, False)
+    def make_objects(self, frame=0):
+        return self.make_objs(frame, make_view=False)
 
     def make_objs(self, frame:int=0, make_view:bool=True):
         if not self.spacetime:
@@ -623,7 +454,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 elif self.dim == 2:
                     obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
                 else:
-                    obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, alpha*10))
+                    height = 14 * float(cell.count) / float(self.num)
+                    obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, height))
                 obj.option(color=color)
                 objs[id] = obj
 
@@ -631,13 +463,13 @@ class MainWindow(QtWidgets.QMainWindow):
             min_dir = 1000000
             max_dir = -1000000
             for cell in view_cells:
-                dir = self._get_next_number_dir(cell)
+                dir = self._get_next_number_dir(self.dim, cell)
                 ndir = np.linalg.norm(dir)
                 if ndir < min_dir: min_dir = ndir
                 if ndir > max_dir: max_dir = ndir
 
             for cell in view_cells:
-                dir = self._get_next_number_dir(cell)
+                dir = self._get_next_number_dir(self.dim, cell)
                 mod_dir = np.linalg.norm(dir)
                 if min_dir < max_dir:
                     k = np.power((mod_dir*1.5 - min_dir) / (max_dir*15 - min_dir), 0.75)
@@ -974,10 +806,10 @@ class MainWindow(QtWidgets.QMainWindow):
 
 
 if __name__=="__main__":
+    freeze_support()
     QtWidgets.QApplication.setAttribute(Qt.AA_ShareOpenGLContexts, False)
     app = QtWidgets.QApplication(sys.argv)
-    freeze_support()
     settings.load(settings_file)
-    wi = MainWindow()
-    wi.show()
+    mw = MainWindow()
+    mw.show()
     sys.exit(app.exec())

@@ -10,6 +10,33 @@ from renderView import RenderView
 from timing import timing
 
 
+class ViewRender:
+    def __init__(self, type: str) -> None:
+        self.type = type
+        self.render_scene = rendering.Scene(options=None)
+        self.render_view = RenderView(self.render_scene, share=False)
+
+    def __del__(self):
+        del self.render_scene
+        del self.render_view
+
+    def set_projection(self, projection):
+        self.render_view.projection = deepcopy(projection)
+
+    def set_navigation(self, navigation):
+        self.render_view.navigation = deepcopy(navigation)
+
+    def render(self, resx, resy, objs):
+        self.render_scene.sync(objs)
+        self.render_view.resize((resx, resy))
+        img = self.render_view.render()
+        return img
+    
+    def rotate3DVideo(self, dx):
+        if self.type in ['3D', '3DVIEW']:
+            self.render_view.navigation.rotate(dx, 0, 0)
+
+
 class View(QtWidgets.QWidget):
     def __init__(self, type: str, mainWindow, parent=None) -> None:
         super().__init__()
