@@ -35,7 +35,7 @@ class ViewRender:
     
     def rotate3DVideo(self, dx):
         if self.type in ['3D', '3DVIEW']:
-            self.render_view.navigation.rotate(dx, 0, 0)
+            self.render_view.navigation.yaw += dx*math.pi
 
     def rotateTo3DVideo(self, dx):
         if self.type in ['3D', '3DVIEW']:
@@ -156,13 +156,13 @@ class View(QtWidgets.QWidget):
     
     def rotate3DView(self, dx):
         if self.type in ['3D', '3DVIEW']:
-            self.view.navigation.rotate(dx, 0, 0)
+            self.view.navigation.yaw += dx*math.pi
             self.view.update()
             self.update()
 
     def rotate3DVideo(self, dx):
         if self.type in ['3D', '3DVIEW']:
-            self.view.navigation.rotate(dx, 0, 0)
+            self.view.navigation.yaw += dx*math.pi
 
 
 class Views(QtWidgets.QWidget):

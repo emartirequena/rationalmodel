@@ -314,7 +314,7 @@ def _saveImages(args):
             image_resx, image_resy, path, rotate, dx
         ))
 
-    num_cpus = min(cpu_count()-6, range_frames)
+    num_cpus = int(cpu_count() * 0.8)
     pool = Pool(num_cpus)
     pool.imap(func=_create_image, iterable=params, chunksize=5)
     pool.close()
