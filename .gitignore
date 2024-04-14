@@ -4,11 +4,10 @@
 *.png
 *.doc*
 *.xls*
-config.json
 build/
 dist/
 *.ico
-build/
-dist/
 docs/
 paper/
+config.json
+
