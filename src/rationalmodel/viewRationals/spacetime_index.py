@@ -147,7 +147,7 @@ class Space(object):
 	def __del__(self):
 		del self.cells
 
-	def getCell(self, x, y, z):
+	def getCell(self, x, y=0, z=0):
 		nx =  c * self.t - x
 		ny = (c * self.t - y) if self.dim > 1 else 0.0
 		nz = (c * self.t - z) if self.dim > 2 else 0.0
@@ -180,7 +180,10 @@ class Space(object):
 			self.indexes[n] = -1
 
 	def save(self):
-		return self.cells
+		out_cells = []
+		for cell in self.cells:
+			out_cells.append(cell.get())
+		return out_cells
 	
 	def load(self, input: list[dict]):
 		self.clear()
