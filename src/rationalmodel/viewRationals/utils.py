@@ -17,10 +17,11 @@ def check_ffmpeg(ffmpeg_path: str) -> bool:
 
 def collect(s=''):
     if s:
-        print(f'------- {max(gc.collect(2), gc.collect(1), gc.collect())} objects cleaned in {s}...')
+        print(f'------- {max(gc.collect(2), gc.collect(1), gc.collect())} objects cleaned for {s}...')
     else:
-        print(f'------- {max(gc.collect(2), gc.collect(1), gc.collect())} objects cleaned...')
-
+        gc.collect(2)
+        gc.collect(1)
+        gc.collect()
 
 def pil2pixmap(img):
     if img.mode == "RGB":
@@ -50,6 +51,7 @@ def make_video(
         image_resy: int=1080
 ):
     if not check_ffmpeg(ffmpeg_path):
+        print(f'------ ERROR: FFMPEG NOT FOUND, {ffmpeg_path}')
         return False
     options = [
         ffmpeg_path,

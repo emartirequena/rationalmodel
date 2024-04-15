@@ -1,8 +1,8 @@
 {
-    "image_path": "/home/enrique/Escritorio/rationalmodel/paper/images",
-    "video_path": "/home/enrique/Escritorio/rationalmodel/paper/videos",
-    "files_path": "/home/enrique/Escritorio/rationalmodel/paper/files",
-    "ffmpeg_path": "/usr/bin/ffmpeg",
+    "image_path": "C:\\users\\emart\\onedrive\\documentos\\enrique\\rationalmodel\\images\\paper",
+    "video_path": "C:\\users\\emart\\onedrive\\documentos\\enrique\\rationalmodel\\videos\\paper",
+    "files_path": "C:\\users\\emart\\onedrive\\documentos\\enrique\\rationalmodel\\files\\paper",
+    "ffmpeg_path": "C:\\Program Files\\ffmpeg\\bin\\ffmpeg.exe",
     "image_resx": 1200,
     "image_resy": 1200,
     "video_codec": "libx264",
@@ -32,6 +32,5 @@
     "list_color_not_period_prime": [1.0, 0.0, 1.0],
     "list_color_period_special": [0.0, 1.0, 1.0],
     "list_color_period_not_special": [0.0, 0.0, 1.0],
-    "max_octtree_levels": 3
-
+    "max_octtree_levels": 5
 }

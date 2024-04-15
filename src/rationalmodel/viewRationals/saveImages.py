@@ -239,7 +239,7 @@ def _create_image(args):
     del number_img
 
     fname = os.path.join(path, file_name)
-    print(f'------- save: {file_name}, {frame}, {ptime}')
+    print(f'------- save: {file_name}, time: {ptime}')
     img.save(fname)
 
     del args
@@ -252,6 +252,8 @@ def _create_image(args):
 
 
 def _create_video(args):
+    print('------- CREATING VIDEO')
+
     path, image_resx, image_resy, init_time, end_time, \
     prefix, suffix, num_frames, turn_angle, config, \
     number, period, factors, accumulate, dim_str = args
@@ -283,6 +285,7 @@ def _create_video(args):
         image_resx, image_resy
     )
     if not result:
+        print('------- ERROR: Error creating video')
         return
 
     out_video_path = os.path.join(video_path, f'{dim_str}')
@@ -294,6 +297,7 @@ def _create_video(args):
 
     del args
     collect('save video')
+
 
 @timing
 def _saveImages(args):
@@ -353,20 +357,9 @@ def _saveImages(args):
     
     pool = Pool(num_cpus)
     pool.imap(func=_create_image, iterable=params, chunksize=chunksize)
-    pool.close()
-    pool.join()
-
-    del params
-    del args
-
-    # if there are more than one images, save video
-    if not single_image:
-        args = (
-            path, image_resx, image_resy, init_time, end_time,
-            prefix, suffix, num_frames, turn_angle, config,
-            number, period, factors, accumulate, dim_str
-        )
-        _create_video(args)
-
-        del args
-    collect()
+    args_video = (
+        path, image_resx, image_resy, init_time, end_time,
+        prefix, suffix, num_frames, turn_angle, config,
+        number, period, factors, accumulate, dim_str
+    ) if not single_image else ()
+    return (pool, args_video)

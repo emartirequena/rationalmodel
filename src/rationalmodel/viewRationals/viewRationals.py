@@ -19,11 +19,11 @@ from saveVideo import SaveVideoWidget
 from spacetime_index import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video, collect
-from timing import timing, get_last_duration
+from timing import timing, get_duration
 from config import config
 from color import ColorLine
 from histogram import Histogram
-from saveImages import _saveImages
+from saveImages import _saveImages, _create_video
 
 settings_file = r'settings.txt'
 
@@ -31,17 +31,38 @@ opengl_version = (3,3)
 
 
 class VideoThread(Thread):
-    def __init__(self, func, args):
+    def __init__(self, parent, func_process, args_process, func_video, single_image):
         super().__init__()
-        self.func = func
-        self.args = args
+        self.parent = parent
+        self.func_process = func_process
+        self.args_process = args_process
+        self.func_video = func_video
+        self.processes = None
+        self.killed = False
+        self.single_image = single_image
     
     def run(self):
-        self.func(self.args)
+        self.parent.setStatus(f'Creating video sequence...')
+        self.processes = self.func_process(self.args_process)
+        self.processes[0].close()
+        self.processes[0].join()
+        if self.processes[1] and not self.killed:
+            if not self.single_image:
+                self.func_video(self.processes[1])
+                self.parent.setStatus(f'Video saved for number {int(self.parent.number.value()):d} in {get_duration():.2f} secs')
+            else:
+                self.parent.setStatus(f'Image saved for number {int(self.parent.number.value()):d} in {get_duration():.2f} secs')
+        else:
+            self.killed = False
 
     def kill(self):
-        print('------- KILL VIDEO...')
-
+        if self.processes:
+            self.parent.setStatus('TERMINATING VIDEO CREATION...')
+            self.killed = True
+            self.processes[0].terminate()
+            self.processes[0].close()
+            self.processes[0].join()
+            
 
 class MainWindow(QtWidgets.QMainWindow):
     def __init__(self):
@@ -194,6 +215,9 @@ class MainWindow(QtWidgets.QMainWindow):
         app.setOverrideCursor(QtCore.Qt.WaitCursor)
         image_path = self.config.get('image_path')
         frame_rate = self.config.get('frame_rate')
+        single_image = False
+        if num_frames == 1:
+            single_image = True
         if turn_angle > 0:
             frame_rate = 25.0
         if num_frames == 0:
@@ -234,11 +258,8 @@ class MainWindow(QtWidgets.QMainWindow):
             self.maxTime.value()
         )
 
-        self.video_thread = VideoThread(_saveImages, args)
+        self.video_thread = VideoThread(self, _saveImages, args, _create_video, single_image)
         self.video_thread.start()
-
-        # self.video_thread = Thread(target=_saveImages, args=[args])
-        # self.video_thread.start()
 
         app.restoreOverrideCursor()
 
