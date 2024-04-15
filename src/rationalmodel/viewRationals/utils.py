@@ -17,10 +17,9 @@ def check_ffmpeg(ffmpeg_path: str) -> bool:
 
 def collect(s=''):
     if s:
-        print(f'Collect -> {s}')
-    print('Collect(2):', gc.collect(2))
-    print('Collect(1):', gc.collect(1))
-    print('Collect():',  gc.collect() )
+        print(f'------- {max(gc.collect(2), gc.collect(1), gc.collect())} objects cleaned in {s}...')
+    else:
+        print(f'------- {max(gc.collect(2), gc.collect(1), gc.collect())} objects cleaned...')
 
 
 def pil2pixmap(img):

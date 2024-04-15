@@ -22,14 +22,17 @@ class ViewRender:
         del self.render_view
 
     def set_projection(self, projection):
-        self.render_view.projection = deepcopy(projection)
+        self.render_view.set_projection(projection)
 
     def set_navigation(self, navigation):
-        self.render_view.navigation = deepcopy(navigation)
+        self.render_view.set_navigation(navigation)
 
     def render(self, resx, resy, objs):
         self.render_scene.sync(objs)
-        self.render_view.resize((resx, resy))
+        if self.type in ['3DVIEW', '3DLEFT', '3DTOP', '3DFRONT']:
+            self.render_view.resize((resx // 2, resy // 2))
+        else:
+            self.render_view.resize((resx, resy))
         img = self.render_view.render()
         return img
     

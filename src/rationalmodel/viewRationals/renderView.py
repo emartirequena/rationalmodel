@@ -1,6 +1,7 @@
 import gc
 import numpy as np
 import moderngl as mgl
+from copy import deepcopy
 from madcad import rendering, uvec2, fmat4
 from utils import collect
 
@@ -54,6 +55,12 @@ class RenderView(rendering.Offscreen):
                             ('ident', self.fb_ident, self.setup_ident)]
         self.map_ident = np.empty((h,w), dtype='u2')
         self.map_depth = np.empty((h,w), dtype='f4')
+
+    def set_projection(self, projection):
+        self.projection = deepcopy(projection)
+
+    def set_navigation(self, navigation):
+        self.navigation = deepcopy(navigation)
 
     def resize(self, size):
         if size != self.fb_screen.size:

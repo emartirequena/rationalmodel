@@ -19,7 +19,7 @@ from saveVideo import SaveVideoWidget
 from spacetime_index import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video, collect
-from timing import timing
+from timing import timing, get_last_duration
 from config import config
 from color import ColorLine
 from histogram import Histogram
