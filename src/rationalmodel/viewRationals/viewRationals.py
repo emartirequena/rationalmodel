@@ -16,6 +16,7 @@ from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
 from saveVideo import SaveVideoWidget
+from saveImages import make_objects
 from spacetime_index import SpaceTime, Cell
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video, collect
@@ -42,7 +43,7 @@ class VideoThread(Thread):
         self.single_image = single_image
     
     def run(self):
-        self.parent.setStatus(f'Creating video sequence...')
+        self.parent.setStatus(f'Creating video sequence, please wait...')
         self.processes = self.func_process(self.args_process)
         self.processes[0].close()
         self.processes[0].join()
@@ -57,7 +58,7 @@ class VideoThread(Thread):
 
     def kill(self):
         if self.processes:
-            self.parent.setStatus('TERMINATING VIDEO CREATION...')
+            self.parent.setStatus('CANCELED VIDEO CREATION...')
             self.killed = True
             self.processes[0].terminate()
             self.processes[0].close()
@@ -399,174 +400,39 @@ class MainWindow(QtWidgets.QMainWindow):
 
         app.restoreOverrideCursor()
 
-    @staticmethod
-    def _get_next_number_dir(dim, cell: Cell):
-        if dim == 1:
-            v1 = np.array([ 1,  0,  0]) * cell.next_digits[0]
-            v2 = np.array([-1,  0,  0]) * cell.next_digits[1]
-            v = (v1 + v2) / 2.0
-        elif dim == 2:
-            v1 = np.array([ 1,  0,  1]) * cell.next_digits[0]
-            v2 = np.array([-1,  0,  1]) * cell.next_digits[1]
-            v3 = np.array([ 1,  0, -1]) * cell.next_digits[2]
-            v4 = np.array([-1,  0, -1]) * cell.next_digits[3]
-            v = (v1 + v2 + v3 + v4) / 4.0
-        else:
-            v1 = np.array([ 1,  1,  1]) * cell.next_digits[0]
-            v2 = np.array([-1,  1,  1]) * cell.next_digits[1]
-            v3 = np.array([ 1,  1, -1]) * cell.next_digits[2]
-            v4 = np.array([-1,  1, -1]) * cell.next_digits[3]
-            v5 = np.array([ 1, -1,  1]) * cell.next_digits[4]
-            v6 = np.array([-1, -1,  1]) * cell.next_digits[5]
-            v7 = np.array([ 1, -1, -1]) * cell.next_digits[6]
-            v8 = np.array([-1, -1, -1]) * cell.next_digits[7]
-            v = (v1 + v2 + v3 + v4 + v5 + v6 + v7 + v8) / 8.0
-        return v * cell.count
-
     @timing
     def draw_objects(self, frame=0):
-        self.make_objs(frame, make_view=True)
+        objs = make_objects(
+            self.spacetime,
+            self.number.value(),
+            self.dim,
+            self._check_accumulate(),
+            self.config,
+            self.color,
+            self.actionViewObjects.isChecked(),
+            self.actionViewNextNumber.isChecked(), 
+            self.maxTime.value(),
+            frame
+        )
+        self.make_view(frame, objs)
+        del objs
+        collect()
 
     @timing
     def make_objects(self, frame=0):
-        return self.make_objs(frame, make_view=False)
-
-    def make_objs(self, frame:int=0, make_view:bool=True):
-        if not self.spacetime:
-            return
-        if self.number.value() == 0:
-            return
-        if frame > self.spacetime.len():
-            return
-
-        if make_view:
-            frame = self.timeWidget.value()
-            self.deselect_all()
-        
-        view_cells = self.spacetime.getCells(frame, accumulate=self._check_accumulate())
-
-        self.num = 0
-        self.max = -1
-        self.count = 0
-        for cell in view_cells:
-            num = cell.count
-            if num > self.max:
-                self.max = num
-            if num > 0:
-                self.count += 1
-            self.num += num
-        
-        self.setStatus(f'Creating {self.count} cells at time: {frame}')
-
-        if not self._check_accumulate():
-            rad_factor = self.config.get('rad_factor')
-            rad_pow = self.config.get('rad_pow')
-        else:
-            rad_factor = self.config.get('rad_factor_accum')
-            rad_pow = self.config.get('rad_pow_accum')
-        rad_min = self.config.get('rad_min')
-        max_faces = self.config.get('max_faces')
-        faces_pow = self.config.get('faces_pow')
-
-        config.resetKey()
-
-        if self.cell_ids:
-            del self.cell_ids
-        self.cell_ids = {}
-        objs = {}
-
-        if self.actionViewObjects.isChecked():
-            for cell in view_cells:
-                alpha = float(cell.count) / float(self.max)
-                rad = math.pow(alpha / rad_factor, rad_pow)
-                if rad < rad_min:
-                    rad = rad_min
-                id = self.config.getKey()
-                color = self.color.getColor(alpha)
-                if cell.count not in self.cell_ids:
-                    self.cell_ids[cell.count] = []
-                self.cell_ids[cell.count].append(id)
-
-                if self.dim == 3:
-                    obj = icosphere(vec3(cell.x, cell.y, cell.z), rad, resolution=('div', int(max_faces * math.pow(rad, faces_pow))))
-                elif self.dim == 2:
-                    obj = cylinder(vec3(cell.x, 0, cell.y), vec3(cell.x, alpha*10, cell.y), rad)
-                else:
-                    height = 14 * float(cell.count) / float(self.num)
-                    obj = brick(vec3(cell.x - c, 0, 0), vec3(cell.x + c, 1, height))
-                obj.option(color=color)
-                objs[id] = obj
-
-        if self.actionViewNextNumber.isChecked(): 
-            min_dir = 1000000
-            max_dir = -1000000
-            for cell in view_cells:
-                dir = self._get_next_number_dir(self.dim, cell)
-                ndir = np.linalg.norm(dir)
-                if ndir < min_dir: min_dir = ndir
-                if ndir > max_dir: max_dir = ndir
-
-            for cell in view_cells:
-                dir = self._get_next_number_dir(self.dim, cell)
-                mod_dir = np.linalg.norm(dir)
-                if min_dir < max_dir:
-                    k = np.power((mod_dir*1.5 - min_dir) / (max_dir*15 - min_dir), 0.75)
-                    if k <= 1.0e-6:
-                        k = 0.2
-                else:
-                    k = 0.2
-                if mod_dir < 1.0e-6:
-                    continue
-                dir = dir * k / mod_dir
-                mod_dir = k
-
-                base = vec3(cell.x, cell.y, cell.z)
-                dir_len = 5.0
-                if self.dim == 1:
-                    base = vec3(cell.x, 0.0, -1.0)
-                    dir_len = 3.0
-                elif self.dim == 2:
-                    base = vec3(cell.x, 0, cell.y)
-
-                color = vec3(0.6, 0.8, 1.0)
-
-                top = base + dir * dir_len * 0.6
-                rad = mod_dir * 0.4 * 0.8
-                obj = cylinder(top, base, rad)
-                obj.option(color=color)
-                id = self.config.getKey()
-                objs[id] = obj
-
-                base = top
-                top = base + dir * dir_len * 0.4
-                rad = mod_dir * 0.4
-                obj = cone(top, base, rad) 
-                obj.option(color=color)
-                id = self.config.getKey()
-                objs[id] = obj
-
-        del view_cells
-
-        dirs = [X, Y, Z]
-        for dir in dirs:
-            axis = Axis(vec3(0), dir)
-            id = self.config.getKey()
-            objs[id] = axis
-
-        if frame > 0 and self.dim > 1:
-            if not self._check_accumulate():
-                cube = Box(center=vec3(0), width=frame)
-            else:
-                t = self.maxTime.value()
-                cube = Box(center=vec3(0), width=t if frame%2 == 0 else t+c)
-            id = self.config.getKey()
-            objs[id] = cube
-
-        if make_view:
-            self.make_view(frame, objs)
-            return None
-        else:
-            return objs
+        objs = make_objects(
+            self.spacetime,
+            self.number.value(),
+            self.dim,
+            self._check_accumulate(),
+            self.config,
+            self.color,
+            self.actionViewObjects.isChecked(),
+            self.actionViewNextNumber.isChecked(), 
+            self.maxTime.value(),
+            frame
+        )
+        return objs
 
     def make_view(self, frame, objs=None):
         objs = objs or {}

@@ -317,7 +317,10 @@ def _saveImages(args):
         suffix = '_' + suffix
 
     single_image = True if num_frames == 1 else False
-    path = _makePath(accumulate, factors, image_path, dim_str, period, number, single_image, subfolder)
+    try:
+        path = _makePath(accumulate, factors, image_path, dim_str, period, number, single_image, subfolder)
+    except Exception as e:
+        print(f'ERROR: {str(e)}')
 
     image_resx = config.get('image_resx')
     image_resy = config.get('image_resy')
