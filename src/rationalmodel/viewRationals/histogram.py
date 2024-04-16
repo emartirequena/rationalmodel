@@ -16,7 +16,7 @@ colors = [(100, 100, 100), (200, 100, 0), (150, 80, 0), (255, 255, 0)]
 
 
 class Item:
-    def __init__(self, x: int, height: int, color: vec3, count: int) -> None:
+    def __init__(self, x: int, height: int, color, count: int) -> None:
         self.x = x
         self.height = height
         self.count = count
@@ -49,7 +49,7 @@ class Scene:
         self.items = []
         self.max_x = 0.
         
-    def add(self, x: int, height: int, color: vec3, count: int):
+    def add(self, x: int, height: int, color, count: int):
         self.items.append(Item(x, height, color, count))
         if x > self.max_x: self.max_x = x
 
@@ -211,6 +211,7 @@ class Histogram(QtWidgets.QWidget):
         self.number_str = ''
         self.accumulate = False
         self.moving = False
+        self.change_flag = False
         if not parent:
             self.config = config
         else:
@@ -288,6 +289,9 @@ class Histogram(QtWidgets.QWidget):
 
     @timing
     def _make_items(self):
+        if not self.spacetime:
+            return
+        
         dict_objs = {}
         view_cells = self.spacetime.getCells(self.time, self.accumulate)
 

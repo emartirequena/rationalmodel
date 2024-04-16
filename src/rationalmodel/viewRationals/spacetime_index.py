@@ -191,6 +191,13 @@ class Space(object):
 			cell = self.getCell(*in_cell['pos'])
 			cell.set(in_cell['count'], in_cell['time'], in_cell['next_digits'], in_cell['rationals'])
 
+	def getMaxTime(self):
+		max_time = -1
+		for cell in self.cells:
+			if cell.time > max_time:
+				max_time = cell.time
+		return max_time
+
 
 class Spaces:
 	def __init__(self, T, n, max, dim=1) -> None:
@@ -224,6 +231,21 @@ class Spaces:
 			self.accumulates_even.add(time, reminders, digits, m, next_digit, x, y, z)
 		else:
 			self.accumulates_odd.add(time, reminders, digits, m, next_digit, x, y, z)
+
+	def getMaxTime(self, accumulate):
+		max_time = -1
+		if not accumulate:
+			for space in self.spaces:
+				spc_time = space.getMaxTime()
+				if spc_time > max_time:
+					max_time = spc_time
+			return max_time
+		else:
+			max_time = self.accumulates_even.getMaxTime()
+			odd_max_time = self.accumulates_odd.getMaxTime()
+			if odd_max_time > max_time:
+				max_time = odd_max_time
+		return max_time
 
 	def clear(self):
 		for space in self.spaces:
@@ -348,6 +370,9 @@ class SpaceTime(object):
 	def getSpace(self, t, accumulate=False):
 		return self.spaces.getSpace(t, accumulate)
 	
+	def getMaxTime(self, accumulate=False):
+		return self.spaces.getMaxTime(accumulate)
+	
 	def add(self, r: Rational, t, x, y, z):
 		for rt in range(0, self.max + 1):
 			px, py, pz = r.position(rt)
@@ -360,7 +385,7 @@ class SpaceTime(object):
 			next_digit = r.digit(t+rt+1)
 			time = r.time(t+rt)
 			self.spaces.add(self.is_special, t+rt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
-	
+
 	@timing
 	def setRationalSet(self, n: int, is_special: bool = False):
 		self.n = n

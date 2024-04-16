@@ -152,7 +152,7 @@ class MainWindowUI:
         mw.menuUtils.addAction(mw.actionSaveVideo)
 
         mw.actionCancelVideo = QtWidgets.QAction('Cancel Video', mw)
-        mw.actionCancelVideo.setShortcut('Ctrl+V')
+        mw.actionCancelVideo.setShortcut('K')
         mw.actionCancelVideo.triggered.connect(mw.cancelVideo)
         mw.menuUtils.addAction(mw.actionCancelVideo)
 
@@ -188,6 +188,17 @@ class MainWindowUI:
         mw.actionViewObjects.triggered.connect(mw.update_view)
         mw.menuUtils.addAction(mw.actionViewObjects)
 
+        mw.actionViewTime = QtWidgets.QAction('View Time', mw)
+        mw.actionViewTime.setShortcut('P')
+        mw.actionViewTime.setCheckable(True)
+        mw.actionViewTime.setChecked(False)
+        mw.actionViewTime.triggered.connect(mw.update_view)
+        mw.menuUtils.addAction(mw.actionViewTime)
+
+        mw.viewActionGroup = QtWidgets.QActionGroup(mw)
+        mw.viewActionGroup.addAction(mw.actionViewObjects)
+        mw.viewActionGroup.addAction(mw.actionViewTime)
+        
         mw.actionViewNextNumber = QtWidgets.QAction('View Next Number', mw)
         mw.actionViewNextNumber.setShortcut('N')
         mw.actionViewNextNumber.setCheckable(True)

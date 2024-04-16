@@ -3,7 +3,7 @@ from madcad.mathutils import lerp
 
 
 class ColorKnot:
-    def __init__(self, alpha: float, value: vec3) -> None:
+    def __init__(self, alpha: float, value) -> None:
         self.alpha = alpha
         self.value = value
 
@@ -13,13 +13,13 @@ class ColorLine:
         self.knots: list[ColorKnot] = []
         self.normalized = False
     
-    def add(self, alpha: float, value: vec3) -> None:
+    def add(self, alpha: float, value) -> None:
         self.knots.append(ColorKnot(alpha, value))
         self.knots.sort(key=lambda x: x.alpha)
         self.normalized = False
 
     @staticmethod
-    def _blend(a: vec3, b: vec3, alpha: float) -> vec3:
+    def _lerp(a, b, alpha: float):
         r = lerp(a.x, b.x, alpha)
         g = lerp(a.y, b.y, alpha)
         b = lerp(a.z, b.z, alpha)
@@ -31,7 +31,7 @@ class ColorLine:
             for knot in self.knots:
                 knot.alpha = knot.alpha / self.knots[-1].alpha
 
-    def getColor(self, alpha: float) -> vec3:
+    def getColor(self, alpha: float):
         self.normalize()
         if alpha <= 0.0:
             return self.knots[0].value
@@ -42,7 +42,7 @@ class ColorLine:
                 alpha1 = self.knots[index - 1].alpha
                 alpha2 = self.knots[index].alpha
                 beta = (alpha - alpha1) / (alpha2 - alpha1)
-                color = self._blend(
+                color = self._lerp(
                     self.knots[index - 1].value,
                     self.knots[index].value,
                     beta

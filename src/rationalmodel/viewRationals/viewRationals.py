@@ -26,8 +26,8 @@ from color import ColorLine
 from histogram import Histogram
 from saveImages import _saveImages, _create_video
 
-settings_file = r'settings.txt'
 
+settings_file = r'settings.txt'
 opengl_version = (3,3)
 
 
@@ -58,7 +58,7 @@ class VideoThread(Thread):
 
     def kill(self):
         if self.processes:
-            self.parent.setStatus('CANCELED VIDEO CREATION...')
+            self.parent.setStatus('VIDEO CREATION CANCELLED...')
             self.killed = True
             self.processes[0].terminate()
             self.processes[0].close()
@@ -255,6 +255,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self._check_accumulate(),
             self._getDimStr(),
             self.actionViewObjects.isChecked(),
+            self.actionViewTime.isChecked(),
             self.actionViewNextNumber.isChecked(),
             self.maxTime.value()
         )
@@ -324,7 +325,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def print_selection(self):
         selected_cells, selected_paths = self.get_selected_paths()
-        max = self.num or 1
+        max = self.number.value() or 1
         if selected_cells == 0:
             self.setStatus('Selected cells: 0')
             return
@@ -402,7 +403,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     @timing
     def draw_objects(self, frame=0):
-        objs = make_objects(
+        frame = self.timeWidget.value()
+        objs, count_cells, self.cell_ids = make_objects(
             self.spacetime,
             self.number.value(),
             self.dim,
@@ -410,17 +412,18 @@ class MainWindow(QtWidgets.QMainWindow):
             self.config,
             self.color,
             self.actionViewObjects.isChecked(),
+            self.actionViewTime.isChecked(),
             self.actionViewNextNumber.isChecked(), 
             self.maxTime.value(),
             frame
         )
-        self.make_view(frame, objs)
+        self.make_view(frame, objs=objs, count_cells=count_cells)
         del objs
         collect()
 
     @timing
-    def make_objects(self, frame=0):
-        objs = make_objects(
+    def make_objects(self, frame):
+        objs, _, _ = make_objects(
             self.spacetime,
             self.number.value(),
             self.dim,
@@ -428,13 +431,14 @@ class MainWindow(QtWidgets.QMainWindow):
             self.config,
             self.color,
             self.actionViewObjects.isChecked(),
+            self.actionViewTime.isChecked(),
             self.actionViewNextNumber.isChecked(), 
             self.maxTime.value(),
             frame
         )
         return objs
 
-    def make_view(self, frame, objs=None):
+    def make_view(self, frame, objs=None, count_cells=0):
         objs = objs or {}
         if not self.views:
             print("view doesn't exists...")
@@ -460,7 +464,7 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.histogram.set_time(frame, self._check_accumulate())
                 self.histogram.show()
         
-        self.setStatus(f'{self.count} cells created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
+        self.setStatus(f'{count_cells} cells created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
 
     def fit_histogram(self):
         if not self.histogram or not self.view_histogram:
