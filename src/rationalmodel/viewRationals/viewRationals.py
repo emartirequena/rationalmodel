@@ -178,6 +178,29 @@ class MainWindow(QtWidgets.QMainWindow):
         print('------- set max time')
         self.timeWidget.setValue(self.maxTime.value())
 
+    def moveNextCycle(self):
+        frame = self.timeWidget.value()
+        T = self.period.value()
+        cycle = frame // T
+        frame = (cycle + 1) * T
+        if frame < self.maxTime.value():
+            self.timeWidget.setValue(frame)
+        else:
+            self.timeWidget.setValue(self.maxTime.value())
+
+    def movePrevCycle(self):
+        frame = self.timeWidget.value()
+        T = self.period.value()
+        cycle = frame // T
+        if frame % T == 0:
+            frame = (cycle - 1) * T
+        else:
+            frame = cycle * T
+        if frame > 0:
+            self.timeWidget.setValue(frame)
+        else:
+            self.timeWidget.setValue(0)
+
     def decrementTime(self):
         print('------- decrement time...')
         t = self.timeWidget.value()

@@ -256,17 +256,31 @@ class MainWindowUI:
         mw.actionRight.triggered.connect(mw.incrementTime)
         mw.menuTime.addAction(mw.actionRight)
 
+        mw.menuTime.addSeparator()
+
         mw.actionInit = QtWidgets.QAction('Go to init', mw.centralWidget())
-        mw.actionInit.setShortcut('Home')
+        mw.actionInit.setShortcut('Ctrl+Home')
         mw.actionInit.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         mw.actionInit.triggered.connect(mw.setTimeInit)
         mw.menuTime.addAction(mw.actionInit)
 
         mw.actionEnd = QtWidgets.QAction('Go to end', mw.centralWidget())
-        mw.actionEnd.setShortcut('End')
+        mw.actionEnd.setShortcut('Ctrl+End')
         mw.actionEnd.setShortcutContext(QtCore.Qt.ApplicationShortcut)
         mw.actionEnd.triggered.connect(mw.setTimeEnd)
         mw.menuTime.addAction(mw.actionEnd)
+
+        mw.actionPrevCycle = QtWidgets.QAction('Go to previous cycle', mw.centralWidget())
+        mw.actionPrevCycle.setShortcut('Home')
+        mw.actionPrevCycle.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        mw.actionPrevCycle.triggered.connect(mw.movePrevCycle)
+        mw.menuTime.addAction(mw.actionPrevCycle)
+
+        mw.actionNextCycle = QtWidgets.QAction('Go to next cycle', mw.centralWidget())
+        mw.actionNextCycle.setShortcut('End')
+        mw.actionNextCycle.setShortcutContext(QtCore.Qt.ApplicationShortcut)
+        mw.actionNextCycle.triggered.connect(mw.moveNextCycle)
+        mw.menuTime.addAction(mw.actionNextCycle)
 
         mw.menu.addMenu(mw.menuTime)
 
