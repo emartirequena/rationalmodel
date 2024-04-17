@@ -84,6 +84,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.histogram = None
         self.view_histogram = True
         self.view_objects = True
+        self.view_time = False
         self.view_next_number = False
         self.spacetime = None
         self.video_thread = None
@@ -411,9 +412,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self._check_accumulate(),
             self.config,
             self.color,
-            self.actionViewObjects.isChecked(),
-            self.actionViewTime.isChecked(),
-            self.actionViewNextNumber.isChecked(), 
+            self.view_objects,
+            self.view_time,
+            self.view_next_number, 
             self.maxTime.value(),
             frame
         )
@@ -430,9 +431,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self._check_accumulate(),
             self.config,
             self.color,
-            self.actionViewObjects.isChecked(),
-            self.actionViewTime.isChecked(),
-            self.actionViewNextNumber.isChecked(), 
+            self.view_objects,
+            self.view_time,
+            self.view_next_number, 
             self.maxTime.value(),
             frame
         )
@@ -621,7 +622,28 @@ class MainWindow(QtWidgets.QMainWindow):
         self.changed_spacetime = True
         self.need_compute = True
 
-    def update_view(self):
+    def update_view_objects(self):
+        if self.view_objects:
+            self.view_objects = False
+        else:
+            self.view_objects = True
+        self.view_time = False
+        self.actionViewObjects.setChecked(self.view_objects)
+        self.actionViewTime.setChecked(self.view_time)
+        self.draw_objects()
+
+    def update_view_time(self):
+        if self.view_time:
+            self.view_time = False
+        else:
+            self.view_time = True
+        self.view_objects = False
+        self.actionViewObjects.setChecked(self.view_objects)
+        self.actionViewTime.setChecked(self.view_time)
+        self.draw_objects()
+
+    def update_view_next_number(self):
+        self.view_next_number = not self.view_next_number
         self.draw_objects()
 
     def saveSpecials(self):

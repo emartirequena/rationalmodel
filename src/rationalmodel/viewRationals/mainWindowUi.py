@@ -185,25 +185,21 @@ class MainWindowUI:
         mw.actionViewObjects.setShortcut('O')
         mw.actionViewObjects.setCheckable(True)
         mw.actionViewObjects.setChecked(True)
-        mw.actionViewObjects.triggered.connect(mw.update_view)
+        mw.actionViewObjects.triggered.connect(mw.update_view_objects)
         mw.menuUtils.addAction(mw.actionViewObjects)
 
         mw.actionViewTime = QtWidgets.QAction('View Time', mw)
         mw.actionViewTime.setShortcut('P')
         mw.actionViewTime.setCheckable(True)
         mw.actionViewTime.setChecked(False)
-        mw.actionViewTime.triggered.connect(mw.update_view)
+        mw.actionViewTime.triggered.connect(mw.update_view_time)
         mw.menuUtils.addAction(mw.actionViewTime)
 
-        mw.viewActionGroup = QtWidgets.QActionGroup(mw)
-        mw.viewActionGroup.addAction(mw.actionViewObjects)
-        mw.viewActionGroup.addAction(mw.actionViewTime)
-        
         mw.actionViewNextNumber = QtWidgets.QAction('View Next Number', mw)
         mw.actionViewNextNumber.setShortcut('N')
         mw.actionViewNextNumber.setCheckable(True)
         mw.actionViewNextNumber.setChecked(False)
-        mw.actionViewNextNumber.triggered.connect(mw.update_view)
+        mw.actionViewNextNumber.triggered.connect(mw.update_view_next_number)
         mw.menuUtils.addAction(mw.actionViewNextNumber)
 
         mw.menu.addMenu(mw.menuUtils)
