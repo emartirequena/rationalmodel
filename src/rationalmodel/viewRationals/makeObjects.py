@@ -93,13 +93,12 @@ def make_objects(spacetime, number, dim, accumulate, config, ccolor, view_object
                 continue
             alpha = float(cell.time) / float(max_spaces_time)
             rad = math.pow(alpha / rad_factor, rad_pow)
-            if rad < rad_min:
-                rad = rad_min
+            if rad == 0:
+                continue
             color = ccolor.getColor(alpha)
 
             if dim == 3:
                 f = 4 * rad
-                # obj = brick(vec3(cell.x - f, cell.y - f, cell.z - f), vec3(cell.x + f, cell.y + f, cell.z + f))
                 obj = icosahedron(vec3(cell.x, cell.y, cell.z), f)
             elif dim == 2:
                 obj = brick(vec3(cell.x - c, 0, cell.y - c), vec3(cell.x + c, alpha*10, cell.y + c))
