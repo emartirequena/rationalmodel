@@ -3,13 +3,13 @@ from PyQt5.QtGui import QMouseEvent, QWheelEvent, QKeyEvent
 from PIL import Image, ImageDraw
 from madcad import vec3
 import numpy as np
-import gc
-import time
+from multiprocessing import managers
 
 from config import config
 from color import ColorLine
 from utils import pil2pixmap
 from timing import timing
+from spacetime import SpaceTime
 
 epsilon = 5.
 colors = [(100, 100, 100), (200, 100, 0), (150, 80, 0), (255, 255, 0)]
@@ -88,7 +88,7 @@ class Scene:
     
     def _loga_round(self, a, x):
         return int(np.power(a, int(self._loga(a, x))))
-    
+
     def _get_y_step_max(self, y_base):
         y_step = int(self._loga_round(y_base, 1.0))
         y_step = y_step if y_step > 0 else 1
@@ -203,9 +203,9 @@ class SelectArea:
 
 
 class Histogram(QtWidgets.QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent, spacetime):
         super().__init__(parent=parent)
-        self.spacetime: SpaceTime = None
+        self.spacetime: SpaceTime = spacetime
         self.time = 0
         self.number = 0
         self.number_str = ''
@@ -262,11 +262,9 @@ class Histogram(QtWidgets.QWidget):
     def set_spacetime(self, spacetime):
         if not spacetime:
             return
-        if not self.spacetime or self.spacetime.T != spacetime.T:
-            self.change_flag = True
-        else:
-            self.change_flag = False
-        self.spacetime = spacetime
+        if not self.spacetime:
+            self.spacetime = spacetime
+        self.change_flag = self.spacetime.changed
 
     def reset(self):
         img = self.scene.render()
@@ -275,8 +273,8 @@ class Histogram(QtWidgets.QWidget):
             self.show()
             self.update()
 
-    def set_time(self, time, accumulate=False):
-        self.time = time
+    def set_time(self, accumulate=False):
+        self.time = self.parent().timeWidget.value()
         self.accumulate = accumulate
         self.display_all()
 
@@ -287,7 +285,6 @@ class Histogram(QtWidgets.QWidget):
             self.change_flag = False
         self.reset()
 
-    @timing
     def _make_items(self):
         if not self.spacetime:
             return
@@ -316,7 +313,6 @@ class Histogram(QtWidgets.QWidget):
 
         del view_cells
         del dict_objs
-        # gc.collect()
 
     def prepare_save_image(self):
         self.old_time = self.time

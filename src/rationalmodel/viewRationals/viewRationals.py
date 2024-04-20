@@ -1,23 +1,21 @@
 import os
 import sys
-import math
 from time import time, sleep
-from multiprocessing import freeze_support, active_children, Process
-import math
-from threading import Thread, Event
+from multiprocessing import freeze_support, Manager
+from threading import Thread
 from copy import deepcopy
+from multiprocessing import managers
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
 import numpy as np
-from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icosphere, cone
-
+from madcad import vec3, settings
 from mainWindowUi import MainWindowUI
 from views import Views
 from saveSpecials import SaveSpecialsWidget
 from saveVideo import SaveVideoWidget
 from saveImages import make_objects
-from spacetime_index import SpaceTime, Cell
+from spacetime_index import SpaceTime
 from rationals import c
 from utils import getDivisorsAndFactors, divisors, make_video, collect
 from timing import timing, get_duration
@@ -29,6 +27,11 @@ from saveImages import _saveImages, _create_video
 
 settings_file = r'settings.txt'
 opengl_version = (3,3)
+
+class MyManager(managers.BaseManager):
+	...
+
+MyManager.register('SpaceTime', SpaceTime)
 
 
 class VideoThread(Thread):
@@ -47,14 +50,17 @@ class VideoThread(Thread):
         self.processes = self.func_process(self.args_process)
         self.processes[0].close()
         self.processes[0].join()
-        if self.processes[1] and not self.killed:
-            if not self.single_image:
-                self.func_video(self.processes[1])
-                self.parent.setStatus(f'Video saved for number {int(self.parent.number.value()):d} in {get_duration():.2f} secs')
-            else:
-                self.parent.setStatus(f'Image saved for number {int(self.parent.number.value()):d} in {get_duration():.2f} secs')
+        if self.processes[1] and not self.killed and not self.single_image:
+            self.func_video(self.processes[1])
+            self.parent.setStatus(f'Video saved for number {int(self.parent.number.value()):d} in {get_duration():.2f} secs')
+        elif not self.killed:
+            self.parent.setStatus(f'Image saved for number {int(self.parent.number.value()):d} in {get_duration():.2f} secs')
         else:
             self.killed = False
+        self.parent.shr_num_video_frames.value = -1
+        del self.args_process
+        del self.processes
+        collect()
 
     def kill(self):
         if self.processes:
@@ -63,6 +69,9 @@ class VideoThread(Thread):
             self.processes[0].terminate()
             self.processes[0].close()
             self.processes[0].join()
+            self.parent.cancelVideo()
+            del self.processes
+            collect()
             
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -77,6 +86,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.views = None
         self.timer = QtCore.QTimer(self)
         self.timer.timeout.connect(self.rotate3DView)
+        self.timer_video = QtCore.QTimer(self)
+        self.timer_video.timeout.connect(self.message_video)
         self.turntable_angle = 0.005
         self.first_number_set = False
         self.changed_spacetime = True
@@ -86,7 +97,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.view_objects = True
         self.view_time = False
         self.view_next_number = False
-        self.spacetime = None
+        self.manager = MyManager()
+        self.manager.start()
+        self.spacetime: SpaceTime = self.manager.SpaceTime(2, 2, 2, 1)
         self.video_thread = None
         self.factors = ''
         self.num = 0
@@ -133,8 +146,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self.divisors.clear()
         self.factorsLabel.setText('')
         self.label_num_divisors.setText('')
-        if self.histogram:
-            self.histogram.set_spacetime(None)
         pressed     = 'QPushButton {background-color: bisque;      color: red;    border-width: 1px; border-radius: 4px; border-style: outset; border-color: gray;}'
         not_pressed = 'QPushButton {background-color: floralwhite; color: black;  border-width: 1px; border-radius: 4px; border-style: outset; border-color: gray;}' \
                       'QPushButton:hover {background-color: lightgray; border-color: blue;}'
@@ -257,9 +268,18 @@ class MainWindow(QtWidgets.QMainWindow):
             end_frame = 6
             num_frames = 6
 
+        manager = Manager()
+        projection = self.views.views[self.views.mode].view.projection
+        navigation = self.views.views[self.views.mode].view.navigation
+        shr_projection = manager.Value(type(projection), projection)
+        shr_navigation = manager.Value(type(navigation), navigation)
+        self.num_video_frames = 0
+        self.max_video_frames = deepcopy(num_frames)
+        self.shr_num_video_frames = manager.Value(int, self.num_video_frames)
+
         args = (
-            deepcopy(self.views.views[self.views.mode].view.projection),
-            deepcopy(self.views.views[self.views.mode].view.navigation),
+            shr_projection,
+            shr_navigation,
             image_path,
             init_frame,
             end_frame,
@@ -271,7 +291,7 @@ class MainWindow(QtWidgets.QMainWindow):
             config,
             self.color,
             self.views.views[self.views.mode].type,
-            deepcopy(self.spacetime),
+            self.spacetime,
             self.dim,
             self.number.value(),
             self.period.value(),
@@ -281,17 +301,28 @@ class MainWindow(QtWidgets.QMainWindow):
             self.actionViewObjects.isChecked(),
             self.actionViewTime.isChecked(),
             self.actionViewNextNumber.isChecked(),
-            self.maxTime.value()
+            self.maxTime.value(),
+            self.shr_num_video_frames
         )
 
+        self.timer_video.start(1000)
         self.video_thread = VideoThread(self, _saveImages, args, _create_video, single_image)
         self.video_thread.start()
 
         app.restoreOverrideCursor()
 
     def cancelVideo(self):
+        self.timer_video.stop()
         if self.video_thread:
             self.video_thread.kill()
+
+    def message_video(self):
+        if self.shr_num_video_frames.value < 0:
+            self.timer_video.stop()
+        elif self.shr_num_video_frames.value == 0:
+            self.setStatus('Initializing video creation. Please wait...')
+        else:
+            self.setStatus(f'Creating video, num frames: {self.shr_num_video_frames.value} / {self.max_video_frames}')
 
     def _switch_display(self, count, state=None):
         for id in self.cell_ids[count]:
@@ -390,14 +421,8 @@ class MainWindow(QtWidgets.QMainWindow):
         n = int(self.number.value())
 
         if self.changed_spacetime:
-            if self.spacetime is not None:
-                if self.histogram is not None:
-                    self.histogram.set_spacetime(None)
-                del self.spacetime
-                self.spacetime = None
-
             self.setStatus('Creating incremental spacetime...')
-            self.spacetime = SpaceTime(self.period.value(), n, self.maxTime.value(), dim=self.dim)
+            self.spacetime.reset(self.period.value(), n, self.maxTime.value(), dim=self.dim)
             self.changed_spacetime = False
             self.need_compute = False
 
@@ -406,7 +431,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setStatus(f'Setting rational set for number: {n} ...')
         self.spacetime.setRationalSet(n, self.is_special)
 
-        self.setStatus('Adding rational set...')
+        self.setStatus(f'Adding rational set for number: {n}...')
         self.spacetime.addRationalSet()
         self.setStatus(f'Rational set added for number {n}')
     
@@ -441,7 +466,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self.maxTime.value(),
             frame
         )
-        self.make_view(frame, objs=objs, count_cells=count_cells)
+        self.make_view(objs=objs, count_cells=count_cells)
         del objs
         collect()
 
@@ -462,7 +487,7 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         return objs
 
-    def make_view(self, frame, objs=None, count_cells=0):
+    def make_view(self, objs=None, count_cells=0):
         objs = objs or {}
         if not self.views:
             print("view doesn't exists...")
@@ -473,19 +498,18 @@ class MainWindow(QtWidgets.QMainWindow):
             print('setting first number...')
             self.first_number_set = True
             self.views.initialize(objs)
-            if not self.histogram: self.histogram = Histogram(parent=self)
-            self.histogram.set_spacetime(self.spacetime)
+            if not self.histogram: 
+                self.histogram = Histogram(self, self.spacetime)
             self.histogram.set_number(int(self.number.value()))
             if self.view_histogram:
-                self.histogram.set_time(frame, self._check_accumulate())
+                self.histogram.set_time(self._check_accumulate())
                 self.histogram.show()
         else:
             print('continue setting number...')
             self.views.reset(objs)
-            self.histogram.set_spacetime(self.spacetime)
             self.histogram.set_number(int(self.number.value()))
             if self.view_histogram:
-                self.histogram.set_time(frame, self._check_accumulate())
+                self.histogram.set_time(self._check_accumulate())
                 self.histogram.show()
         
         self.setStatus(f'{count_cells} cells created at time {self.timeWidget.value()} for number {int(self.number.value())}...')
@@ -736,8 +760,6 @@ class MainWindow(QtWidgets.QMainWindow):
             self.setStatus(f'Loading file {os.path.basename(in_file_name)}...')
             app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.files_path = os.path.dirname(in_file_name)
-            if not self.spacetime:
-                self.spacetime = SpaceTime(2, 2, 2, 1)
             self.spacetime.load(in_file_name)
             self.dim = self.spacetime.dim
             spacetime = self.spacetime

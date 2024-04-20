@@ -2,7 +2,7 @@ import os
 import shutil
 import math
 import time
-from multiprocessing import Pool, cpu_count
+from multiprocessing import Pool, cpu_count, Manager
 from PIL import Image, ImageDraw, ImageFont
 import numpy as np
 from madcad import vec3, settings, Axis, X, Y, Z, Box, cylinder, brick, icosphere, cone
@@ -59,21 +59,21 @@ def _get_number_img(number, period, ptime):
 
 
 def _create_image(args):
-    view_type, projection, navigation, frame, factor, init_time, prefix, suffix, \
-    config, ccolor, spacetime, dim, number, period, factors, accumulate, dim_str, \
+    view_type, shr_projection, shr_navigation, frame, factor, init_time, prefix, suffix, \
+    config, ccolor, shr_spacetime, dim, number, period, factors, accumulate, dim_str, \
     view_objects, view_time, view_next_number, max_time, \
-    image_resx, image_resy, path, rotate, dx = args
+    image_resx, image_resy, path, rotate, dx, shr_num_video_frames = args
 
     settings.load(settings_file)
 
     view = ViewRender(view_type)
-    view.set_projection(projection)
-    view.set_navigation(navigation)
+    view.set_projection(shr_projection.value)
+    view.set_navigation(shr_navigation.value)
     if rotate:
         view.rotateTo3DVideo(dx)
 
     ptime = init_time + frame // factor
-    objs, _, _ = make_objects(spacetime, number, dim, accumulate, config, ccolor, view_objects, view_time, view_next_number, max_time, ptime)
+    objs, _, _ = make_objects(shr_spacetime, number, dim, accumulate, config, ccolor, view_objects, view_time, view_next_number, max_time, ptime)
     if not objs:
         print('------ NOT OBJS')
         return
@@ -88,13 +88,14 @@ def _create_image(args):
         accum_str = 'Accum_'
 
     file_name = f'{accum_str}{prefix}{dim_str}_N{int(number)}_P{int(period):02d}_F{factors}{suffix}.{frame:04d}.png'
+    print(f'------- save: {file_name}, time: {ptime}')
+    shr_num_video_frames.value += 1
 
     number_img = _get_number_img(number, period, ptime)
     img.alpha_composite(number_img, (10, image_resy - 40))
     del number_img
 
     fname = os.path.join(path, file_name)
-    print(f'------- save: {file_name}, time: {ptime}')
     img.save(fname)
 
     del args
@@ -111,7 +112,10 @@ def _create_video(args):
 
     path, image_resx, image_resy, init_time, end_time, \
     prefix, suffix, num_frames, turn_angle, config, \
-    number, period, factors, accumulate, dim_str = args
+    number, period, factors, accumulate, dim_str,\
+    shr_num_video_frames = args
+
+    shr_num_video_frames.value = -1
 
     if accumulate and turn_angle == 0.:
         frame_rate = config.get('frame_rate_accum')
@@ -157,11 +161,11 @@ def _create_video(args):
 @timing
 def _saveImages(args):
 
-    projection, navigation, image_path, init_time, end_time, \
+    shr_projection, shr_navigation, image_path, init_time, end_time, \
     subfolder, prefix, suffix, num_frames, turn_angle, config, \
-    ccolor, view_type, spacetime, dim, number, period, factors, \
+    ccolor, view_type, shr_spacetime, dim, number, period, factors, \
     accumulate, dim_str, view_objects, view_time, view_next_number, \
-    max_time = args
+    max_time, shr_num_video_frames = args
     
     number = int(number)
     period = int(period)
@@ -198,17 +202,24 @@ def _saveImages(args):
     params = []
     for frame in range(range_frames):
         rotate = False
-        dx = navigation.yaw / math.pi
+        dx = shr_navigation.value.yaw / math.pi
         if turn_angle > 0:
             k = 0.005 * 400. / 360.
             dx += frame * k * float(turn_angle) / float(num_frames)
             rotate = True
         params.append((
-            view_type, projection, navigation, frame, factor, init_time, prefix, suffix,
-            config, ccolor, spacetime, dim, number, period, factors, accumulate, dim_str,
+            view_type, shr_projection, shr_navigation, frame, factor, init_time, prefix, suffix,
+            config, ccolor, shr_spacetime, dim, number, period, factors, accumulate, dim_str,
             view_objects, view_time, view_next_number, max_time,
-            image_resx, image_resy, path, rotate, dx            
+            image_resx, image_resy, path, rotate, dx, shr_num_video_frames
         ))
+
+    args_video = (
+        path, image_resx, image_resy, init_time, end_time,
+        prefix, suffix, num_frames, turn_angle, config,
+        number, period, factors, accumulate, dim_str,
+        shr_num_video_frames
+    ) if not single_image else ()
 
     num_cpus = int(cpu_count() * 0.8)
     chunksize = (range_frames // num_cpus) or 1
@@ -216,9 +227,5 @@ def _saveImages(args):
     
     pool = Pool(num_cpus)
     pool.imap(func=_create_image, iterable=params, chunksize=chunksize)
-    args_video = (
-        path, image_resx, image_resy, init_time, end_time,
-        prefix, suffix, num_frames, turn_angle, config,
-        number, period, factors, accumulate, dim_str
-    ) if not single_image else ()
+
     return (pool, args_video)

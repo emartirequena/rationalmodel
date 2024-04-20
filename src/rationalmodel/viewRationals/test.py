@@ -3,7 +3,8 @@ import os
 from config import Config
 from openpyxl import Workbook
 from random import randint
-
+from multiprocessing import Pool, freeze_support, get_context
+from multiprocessing.managers import BaseManager
 from utils import getPeriod, divisors
 from timing import timing
 
@@ -148,5 +149,41 @@ def main4():
     print(n, position, plist)
 
 
+class MyClass:
+    def __init__(self, val):
+        self.val = val
+
+    def set(self, val):
+        print(f'set({val})')
+        self.val = val
+
+    def get(self):
+        return self.val
+    
+class MyManager(BaseManager):
+    pass
+
+MyManager.register("MyClass", MyClass)
+
+def modify(args):
+    myclass, v = args
+    print('----------')
+    print(myclass)
+    print(f'prev get() = {myclass.get()}')
+    myclass.set(v)
+    print(f'last get() = {myclass.get()}')
+    print('----------')
+
+def main5():
+    with MyManager() as manager:
+        myclass = manager.MyClass(-1)
+        pool = Pool(1)
+        pool.imap(func=modify, iterable=[(myclass, v) for v in range(3)])
+        pool.close()
+        pool.join()
+
+        print("Last value stored:", myclass.get())
+
 if __name__ == '__main__':
-    main4()
+    freeze_support()
+    main5()
