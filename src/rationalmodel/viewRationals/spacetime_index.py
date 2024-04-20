@@ -1,10 +1,13 @@
-from multiprocessing import Pool, cpu_count, Pipe
+import os
+from multiprocessing import Pool, cpu_count, managers
 import json
 import gc
-import time
+from openpyxl import Workbook
 
 from rationals import Rational, c
-from timing import timing
+from timing import timing, get_last_duration
+from utils import collect, divisors
+from config import Config
 
 
 spacetime = None
@@ -137,11 +140,7 @@ class Space(object):
 		self.base = 2**dim
 		self.indexes: list[int] = []
 		self.cells: list[Cell] = []
-		num = t + 1
-		if self.dim > 1:
-			num *= t + 1
-		if self.dim > 2:
-			num *= t + 1
+		num = (t + 1)**self.dim
 		self.indexes = [-1 for _ in range(num)]
 
 	def __del__(self):
@@ -297,31 +296,17 @@ class Spaces:
 		self.accumulates_even.load(input['accumulates_even'])
 		self.accumulates_odd.load(input['accumulates_odd'])
 
+class MyManager(managers.BaseManager):
+	...
+
+MyManager.register('Spaces', Spaces)
 
 def create_rational(args):
 	m, n, dim = args
 	return Rational(m, n, dim)
 
 
-def add_rational(args):
-	conn, max, r, t, x, y, z = args
-	r: Rational = args[2]
-	for rt in range(0, max + 1):
-		px, py, pz = r.position(rt)
-		px += x
-		py += y
-		pz += z
-		reminders = r.reminders
-		digits = r.path()
-		m = r.m
-		next_digit = r.digit(t+rt+1)
-		time = r.time(t+rt)
-		obj = (t+rt, reminders, digits, m, next_digit, time, px, py, pz)
-		print('thread...', *obj)
-		conn.send(obj)
-	conn.send(None)
-
-def add_rational2(args):
+def add_rational1(args):
 	_, rt, t, x, y, z = args
 	r: Rational = args[0]
 	px, py, pz = r.position(rt)
@@ -337,6 +322,21 @@ def add_rational2(args):
 	return obj
 
 
+def add_rational2(args):
+	spaces, is_special, pT, max, r, t, x, y, z = args
+	for rt in range(0, max + 1):
+		px, py, pz = r.position(rt)
+		px += x
+		py += y
+		pz += z
+		reminders = r.reminders
+		digits = r.path()
+		m = r.m
+		next_digit = r.digit(t+rt+1)
+		time = r.time(t+rt)
+		spaces.add(is_special, t+rt, reminders, digits, m, next_digit, time, pT, px, py, pz)
+
+
 class SpaceTime(object):
 	def __init__(self, T, n, max, dim=1):
 		self.T = T
@@ -344,13 +344,18 @@ class SpaceTime(object):
 		self.dim = dim
 		self.n = n
 		self.is_special = False
-		self.spaces = Spaces(T, n, max, dim)
+		self.manager = MyManager()
+		self.manager.start()
+		self.spaces = self.manager.Spaces(T, n, max, dim)
 		self.rationalSet = []
+		self.algorithm = 2
+		self.changed = False
 
 	def __del__(self):
 		del self.spaces
-		del self.rationalSet
-		gc.collect()
+		if self.rationalSet:
+			del self.rationalSet
+		collect()
 
 	def len(self):
 		return self.max
@@ -359,7 +364,7 @@ class SpaceTime(object):
 		self.n = 0
 		self.is_special = False
 		self.spaces.clear()
-		gc.collect()
+		collect()
 
 	def getCell(self, t, x, y=0, z=0, accumulate=False):
 		return self.spaces.getCell(t, x, y, z, accumulate)
@@ -373,19 +378,6 @@ class SpaceTime(object):
 	def getMaxTime(self, accumulate=False):
 		return self.spaces.getMaxTime(accumulate)
 	
-	def add(self, r: Rational, t, x, y, z):
-		for rt in range(0, self.max + 1):
-			px, py, pz = r.position(rt)
-			px += x
-			py += y
-			pz += z
-			reminders = r.reminders
-			digits = r.path()
-			m = r.reminder(t+rt)
-			next_digit = r.digit(t+rt+1)
-			time = r.time(t+rt)
-			self.spaces.add(self.is_special, t+rt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
-
 	@timing
 	def setRationalSet(self, n: int, is_special: bool = False):
 		self.n = n
@@ -401,35 +393,61 @@ class SpaceTime(object):
 
 		self.rationalSet = list(sorted(unordered_set, key=lambda x: x.m))
 		del unordered_set
-		gc.collect()
+		collect()
+
+	def set_algorithm(self, algo):
+		self.algorithm = algo
 
 	@timing
 	def addRationalSet(self, t=0, x=0, y=0, z=0):
-		algorithm = 0
-		if self.n >= 20000:
-			algorithm = 1
+		self.spaces.clear()
+		print(f'algorithm: {self.algorithm}')
 
-		if algorithm == 0:
+		if self.algorithm == 0:
 			for r in self.rationalSet:
-				self.add(r, t, x, y, z)
+				add_rational2((self.spaces, self.is_special, self.T, self.max, r, t, x, y, z))
 
-		else:
-			p = Pool(cpu_count())
+		elif self.algorithm == 1:
+			num_cpus = int(cpu_count() * 0.8)
+			chunksize = ((self.max * len(self.rationalSet)) // num_cpus) or 1
+			p = Pool(num_cpus)
 			params = []
 			for r in self.rationalSet:
 				for rt in range(self.max + 1):
 					params.append((r, rt, t, x, y, z))
-			results = p.imap(func=add_rational2, iterable=params, chunksize=1000000)
+			results = p.imap(func=add_rational1, iterable=params, chunksize=chunksize)
+			p.close()
+			p.join()
 
 			for result in results:
 				pt, reminders, digits, m, next_digit, time, px, py, pz = result
 				self.spaces.add(self.is_special, pt, reminders, digits, m, next_digit, time, self.T, px, py, pz)
+				del result
 
-			p.close()
-			p.join()
 			del params
 			del results
-			gc.collect()
+			collect()
+
+		elif self.algorithm == 2:
+			num_cpus = int(cpu_count() * 0.8)
+			chunksize = ((len(self.rationalSet)) // num_cpus) or 1
+			p = Pool(num_cpus)
+			params = []
+			for r in self.rationalSet:
+				params.append((self.spaces, self.is_special, self.T, self.max, r, t, x, y, z))
+
+			p.imap(func=add_rational2, iterable=params, chunksize=chunksize)
+			p.close()
+			p.join()
+
+			del params
+			collect()
+
+		self.changed = False
+
+	def reset(self, T, num, max, dim):
+		self.__init__(T, num, max, dim)
+		self.changed = True
 
 	@timing
 	def save(self, fname):
@@ -442,32 +460,52 @@ class SpaceTime(object):
 			'max': self.max,
 			'spaces': spaces
 		}
-
 		with open(fname, 'wt') as fp:
 			json.dump(output, fp, indent=4)
 
 	@timing
 	def load(self, fname):
 		with open(fname, 'rt') as fp:
-			content = json.load(fp)
-
-		self.__init__(content['T'], content['num'], content['max'], content['dim'])
-		self.is_special = content['special']
-		self.spaces.load(content['spaces'])
+			input = json.load(fp)
+		self.reset(input['T'], input['num'], input['max'], input['dim'])
+		self.is_special = input['special']
+		self.spaces.load(input['spaces'])
 
 
 if __name__ == '__main__':
-	dim = 1
-	T = 6
-	n = (2**dim)**int(T) - 1
-	n = 9
+	config = Config()
+	path = config.get('files_path')
+	fname = os.path.join(path, 'algorithms.xlsx')
+	dim = 3
+	T = 12
+	n = (2**dim)**int(T // 2) + 1
+	divisors = divisors(n)
 	print('Creating spacetime...')
 	spacetime = SpaceTime(T, n, T, dim=dim)
-	print(f'Set rational set for n={n}...')
-	spacetime.setRationalSet(n, is_special=True)
-	print('Add rational set...')
-	spacetime.addRationalSet()
-	# print(f'Save test_1D_N{n}.json...')
-	# spacetime.save(f'test_1D_N{n}.json')
-	# print(f'Load test_1D_N{n}.json...')
-	# spacetime.load(f'test_1D_N{n}.json')
+
+	wb = Workbook()
+	ws = wb.active
+
+	ws.cell(row=1, column=1, value='number')
+	ws.cell(row=1, column=2, value='algo 0')
+	ws.cell(row=1, column=3, value='algo 1')
+	ws.cell(row=1, column=4, value='algo 2')
+
+	for algorithm in range(3):
+		spacetime.set_algorithm(algorithm)
+		row = 2
+		for n in divisors:
+			ws.cell(row=row, column=1, value=n)
+
+			print(f'Set rational set for n={n}...')
+			spacetime.setRationalSet(n, is_special=True)
+			print('Add rational set...')
+			spacetime.addRationalSet()
+
+			duration = get_last_duration()
+			ws.cell(row=row, column=algorithm+2, value=duration)
+			row += 1
+
+	wb.save(fname)
+		
+
