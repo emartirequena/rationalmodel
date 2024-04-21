@@ -259,13 +259,6 @@ class Histogram(QtWidgets.QWidget):
         self.number = number
         self.scene.clear()
 
-    def set_spacetime(self, spacetime):
-        if not spacetime:
-            return
-        if not self.spacetime:
-            self.spacetime = spacetime
-        self.change_flag = self.spacetime.changed
-
     def reset(self):
         img = self.scene.render()
         self.label.setPixmap(pil2pixmap(img))

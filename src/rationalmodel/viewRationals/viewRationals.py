@@ -604,10 +604,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def get_period_factors(self):
         self.setStatus('Computing divisors...')
-        # self.changed_spacetime = True
         self.need_compute = True
         T = int(self.period.value())
-        self.spacetime = None
         self.fillDivisors(T)
         label = self.get_factors(list(self.numbers.keys())[-1])
         self.factorsLabel.setText(label)
@@ -761,19 +759,20 @@ class MainWindow(QtWidgets.QMainWindow):
             app.setOverrideCursor(QtCore.Qt.WaitCursor)
             self.files_path = os.path.dirname(in_file_name)
             self.spacetime.load(in_file_name)
-            self.dim = self.spacetime.dim
+            T, n, max, dim, is_special = self.spacetime.getParams()
+            self.dim = dim
             spacetime = self.spacetime
             self._clear_parameters()
             self.spacetime = spacetime
-            self.period.setValue(self.spacetime.T)
+            self.period.setValue(T)
             self.spacetime = spacetime
-            self.number.setValue(spacetime.n)
-            self.is_special = spacetime.is_special
-            self.maxTime.setValue(spacetime.max)
+            self.number.setValue(n)
+            self.is_special = is_special
+            self.maxTime.setValue(max)
             self.first_number_set = False
             self.changed_spacetime = False
             self.need_compute = False
-            self.time.setValue(spacetime.max)
+            self.time.setValue(max)
             self.views.setFocus()
             app.restoreOverrideCursor()
             time2 = time()
