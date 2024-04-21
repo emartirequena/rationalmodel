@@ -357,6 +357,9 @@ class SpaceTime(object):
 			del self.rationalSet
 		collect()
 
+	def getParams(self):
+		return self.T, self.n, self.max, self.dim, self.is_special
+
 	def len(self):
 		return self.max
 

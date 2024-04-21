@@ -10,7 +10,7 @@ class SaveVideoWidget(QtWidgets.QDialog):
         self.gridlayout = QtWidgets.QGridLayout()
         self.vlayout.addLayout(self.gridlayout)
 
-        self.label1 = QtWidgets.QLabel('Init frame')
+        self.label1 = QtWidgets.QLabel('Init time')
         self.gridlayout.addWidget(self.label1, 0, 0)
         self.init_frame = QtWidgets.QSpinBox(self)
         self.init_frame.setMinimum(0)
@@ -18,7 +18,7 @@ class SaveVideoWidget(QtWidgets.QDialog):
         self.init_frame.setValue(current_frame)
         self.gridlayout.addWidget(self.init_frame, 0, 1)
 
-        self.label2 = QtWidgets.QLabel('End frame')
+        self.label2 = QtWidgets.QLabel('End time')
         self.gridlayout.addWidget(self.label2, 1, 0)
         self.end_frame = QtWidgets.QSpinBox(self)
         self.end_frame.setMinimum(0)
